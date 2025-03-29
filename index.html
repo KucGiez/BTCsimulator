@@ -1,184 +1,155 @@
+import React from 'react';
+import BitcoinPriceSpectrum from './BitcoinPriceSpectrum';
 
-<!DOCTYPE html>
-<html lang="pl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SavingsSimulator</title>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Roboto', sans-serif;
-            background-color: #f0f2f5;
-            color: #333;
-            padding: 20px;
-            line-height: 1.6;
-        }
-
-        .container {
-            max-width: 700px;
-            margin: auto;
-            background-color: white;
-            padding: 30px;
-            border-radius: 15px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-        }
-
-        h1 {
-            text-align: center;
-            color: #007BFF;
-            font-size: 2.2em;
-            margin-bottom: 30px;
-        }
-
-        .calculator h2 {
-            text-align: center;
-            color: #333;
-            font-size: 1.8em;
-        }
-
-        .calculator form {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            margin-top: 20px;
-        }
-
-        .calculator input, .calculator select {
-            padding: 12px;
-            font-size: 1.1em;
-            border-radius: 8px;
-            border: 1px solid #ccc;
-            transition: border-color 0.3s;
-        }
-
-        .calculator input:focus, .calculator select:focus {
-            border-color: #007BFF;
-            outline: none;
-        }
-
-        .calculator button {
-            padding: 15px;
-            background-color: #28a745;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 1.2em;
-            transition: background-color 0.3s;
-        }
-
-        .calculator button:hover {
-            background-color: #218838;
-        }
-
-        #result, #total-investment {
-            text-align: center;
-            margin-top: 25px;
-            font-size: 1.3em;
-            font-weight: bold;
-            color: #007BFF;
-        }
-
-        footer {
-            text-align: center;
-            margin-top: 40px;
-            font-size: 0.9em;
-            color: #666;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>SavingsSimulator</h1>
-        <div class="calculator">
-            <h2>Oblicz, ile Bitcoina byś zgromadził</h2>
-            <form id="investment-form">
-                <label for="years">Od ilu lat inwestujesz:</label>
-                <input type="number" id="years" min="1" max="10" value="5">
-
-                <label for="frequency">Częstotliwość wpłat:</label>
-                <select id="frequency">
-                    <option value="monthly">Co miesiąc</option>
-                    <option value="weekly">Co tydzień</option>
-                    <option value="daily">Codziennie</option>
-                </select>
-
-                <label for="investment-amount">Kwota inwestycji (USD):</label>
-                <input type="number" id="investment-amount" value="50">
-
-                <button type="submit">Oblicz</button>
-            </form>
-
-            <div id="result"></div>
-            <div id="total-investment"></div>
-        </div>
+const BitcoinManifestoPage = () => {
+  return (
+    <div className="min-h-screen bg-gray-900 text-gray-100 p-4">
+      <div className="max-w-6xl mx-auto">
+        {/* Header z dynamicznym gradientem Price Spectrum */}
+        <BitcoinPriceSpectrum />
+        
+        {/* Główna treść z manifestem Satoshi Nakamoto */}
+        <main className="mt-8 bg-gray-800 rounded-lg p-8 shadow-xl">
+          <div className="mb-8 text-center">
+            <h1 className="text-3xl font-bold mb-2">Bitcoin: A Peer-to-Peer Electronic Cash System</h1>
+            <p className="text-gray-400">Satoshi Nakamoto | satoshin@gmx.com | www.bitcoin.org | 31 października 2008</p>
+          </div>
+          
+          <div className="space-y-6 leading-relaxed">
+            <section>
+              <h2 className="text-xl font-semibold mb-3 text-yellow-400">Abstrakt</h2>
+              <p>
+                Czysto peer-to-peer wersja elektronicznej gotówki pozwoliłaby na wysyłanie płatności 
+                online bezpośrednio od jednej strony do drugiej bez przechodzenia przez instytucję 
+                finansową. Podpisy cyfrowe stanowią część rozwiązania, ale główne korzyści 
+                zostają utracone, jeśli zaufana trzecia strona jest nadal wymagana do zapobiegania 
+                podwójnym wydatkom. Proponujemy rozwiązanie problemu podwójnych wydatków przy użyciu 
+                sieci peer-to-peer. Sieć oznacza transakcje czasowymi znacznikami, haszując je w 
+                trwający łańcuch dowodu pracy opartego na haszu, tworząc zapis, który nie może zostać 
+                zmieniony bez ponownego wykonania pracy. Najdłuższy łańcuch nie tylko służy jako dowód 
+                na sekwencję wydarzeń, których byliśmy świadkami, ale dowód, że pochodzi on z największej 
+                puli mocy CPU. Dopóki większość mocy CPU jest kontrolowana przez węzły, które nie 
+                współpracują, aby zaatakować sieć, będą one generować najdłuższy łańcuch i wyprzedzać 
+                atakujących. Sama sieć wymaga minimalnej struktury. Wiadomości są rozgłaszane na zasadzie 
+                najlepszego wysiłku, a węzły mogą opuszczać i dołączać do sieci według woli, akceptując 
+                najdłuższy łańcuch dowodu pracy jako dowód tego, co wydarzyło się podczas ich nieobecności.
+              </p>
+            </section>
+            
+            <section>
+              <h2 className="text-xl font-semibold mb-3 text-yellow-400">1. Wprowadzenie</h2>
+              <p>
+                Handel w internecie stał się prawie wyłącznie zależny od instytucji finansowych 
+                służących jako zaufane strony trzecie do przetwarzania płatności elektronicznych. 
+                Podczas gdy system działa wystarczająco dobrze dla większości transakcji, nadal 
+                cierpi z powodu inherentnych słabości modelu opartego na zaufaniu. Całkowicie 
+                nieodwracalne transakcje nie są naprawdę możliwe, ponieważ instytucje finansowe 
+                nie mogą uniknąć mediacji w sporach. Koszt mediacji zwiększa koszty transakcji, 
+                ograniczając minimalny praktyczny rozmiar transakcji i odcinając możliwość małych, 
+                codziennych transakcji, a istnieje szerszy koszt w postaci utraty możliwości 
+                dokonywania nieodwracalnych płatności za nieodwracalne usługi. Wraz z możliwością 
+                odwrócenia, potrzeba zaufania się rozprzestrzenia. Handlowcy muszą być ostrożni 
+                wobec swoich klientów, dręcząc ich o więcej informacji, niż byłoby to konieczne. 
+                Pewien procent oszustw jest akceptowany jako nieunikniony. Te koszty i niepewności 
+                płatności mogą być uniknięte osobiście, używając fizycznej waluty, ale nie istnieje 
+                mechanizm dokonywania płatności przez kanał komunikacyjny bez zaufanej strony.
+              </p>
+              <p className="mt-4">
+                Potrzebny jest system płatności elektronicznych oparty na dowodzie kryptograficznym 
+                zamiast zaufania, pozwalający dowolnym dwóm chętnym stronom na bezpośrednie transakcje 
+                bez potrzeby zaufanej trzeciej strony. Transakcje, które są obliczeniowo niepraktyczne 
+                do odwrócenia, chroniłyby sprzedawców przed oszustwami, a rutynowe mechanizmy 
+                depozytu powierniczego mogłyby być łatwo zaimplementowane dla ochrony kupujących. 
+                W tej pracy proponujemy rozwiązanie problemu podwójnych wydatków przy użyciu 
+                rozproszonego serwera znaczników czasu peer-to-peer, aby wygenerować obliczeniowy 
+                dowód chronologicznego porządku transakcji. System jest bezpieczny tak długo, jak 
+                uczciwe węzły kolektywnie kontrolują więcej mocy CPU niż jakakolwiek współpracująca 
+                grupa węzłów atakujących.
+              </p>
+            </section>
+            
+            <section>
+              <h2 className="text-xl font-semibold mb-3 text-yellow-400">2. Transakcje</h2>
+              <p>
+                Definiujemy elektroniczną monetę jako łańcuch cyfrowych podpisów. Każdy właściciel 
+                transferuje monetę do następnego, podpisując cyfrowo hasz poprzedniej transakcji 
+                i klucz publiczny następnego właściciela, dodając je na końcu monety. Odbiorca 
+                płatności może zweryfikować podpisy, aby sprawdzić łańcuch własności.
+              </p>
+              <p className="mt-4">
+                Problem oczywiście polega na tym, że odbiorca płatności nie może zweryfikować, 
+                czy jeden z właścicieli nie wydał podwójnie monety. Powszechnym rozwiązaniem jest 
+                wprowadzenie zaufanego centralnego organu lub mennicy, która sprawdza każdą transakcję 
+                pod kątem podwójnego wydatkowania. Po każdej transakcji moneta musi być zwrócona do 
+                mennicy, aby wyemitować nową monetę, a tylko monety wyemitowane bezpośrednio z mennicy 
+                są uznawane za niewydane podwójnie. Problem z tym rozwiązaniem jest taki, że 
+                los całego systemu pieniężnego zależy od firmy prowadzącej mennicę, z każdą transakcją, 
+                która musi przejść przez nich, tak jak bank.
+              </p>
+              <p className="mt-4">
+                Potrzebujemy sposobu, aby odbiorca płatności wiedział, że poprzedni właściciele nie 
+                podpisali żadnych wcześniejszych transakcji. Dla naszych celów, najwcześniejsza 
+                transakcja jest tą, która się liczy, więc nie przejmujemy się późniejszymi próbami 
+                podwójnego wydania. Jedynym sposobem, aby potwierdzić brak transakcji, jest świadomość 
+                wszystkich transakcji. W modelu opartym na mennicy, mennica była świadoma wszystkich 
+                transakcji i decydowała, która pojawiła się pierwsza. Aby to osiągnąć bez zaufanej 
+                strony, transakcje muszą być publicznie ogłaszane, a my potrzebujemy systemu dla 
+                uczestników, aby zgodzić się na jedną historię kolejności, w jakiej zostały otrzymane. 
+                Odbiorca płatności potrzebuje dowodu, że w czasie każdej transakcji, większość węzłów 
+                zgodziła się, że była to pierwsza otrzymana.
+              </p>
+            </section>
+            
+            <section>
+              <h2 className="text-xl font-semibold mb-3 text-yellow-400">3. Serwer Znaczników Czasu</h2>
+              <p>
+                Rozwiązanie, które proponujemy, zaczyna się od serwera znaczników czasu. Serwer 
+                znaczników czasu działa, biorąc hasz bloku elementów do oznaczenia czasem i szeroko 
+                publikując hasz, tak jak w gazecie lub poście Usenet. Znacznik czasu udowadnia, że 
+                dane musiały istnieć w tym czasie, oczywiście, aby dostać się do hasza. Każdy znacznik 
+                czasu zawiera poprzedni znacznik czasu w swoim haszu, tworząc łańcuch, gdzie każdy 
+                dodatkowy znacznik czasu wzmacnia te przed nim.
+              </p>
+            </section>
+            
+            <section>
+              <h2 className="text-xl font-semibold mb-3 text-yellow-400">4. Dowód Pracy</h2>
+              <p>
+                Aby zaimplementować rozproszony serwer znaczników czasu na zasadzie peer-to-peer, 
+                będziemy potrzebować systemu dowodu pracy podobnego do Hashcash Adama Backa, 
+                zamiast gazety czy postów Usenet. Dowód pracy obejmuje skanowanie wartości, która 
+                po zahaszowaniu, na przykład z SHA-256, hasz zaczyna się od określonej liczby zer. 
+                Średnia praca potrzebna jest wykładnicza w liczbie wymaganych zer i może być 
+                zweryfikowana przez wykonanie pojedynczego hasza.
+              </p>
+              <p className="mt-4">
+                Dla naszej sieci znaczników czasu, implementujemy dowód pracy, inkrementując nonce 
+                w bloku, aż znajdzie się wartość, która daje haszowi bloku wymagane zera. Gdy wysiłek 
+                CPU został poświęcony, aby uczynić go satysfakcjonującym w dowodzie pracy, blok nie 
+                może zostać zmieniony bez ponownego wykonania pracy. Ponieważ późniejsze bloki są 
+                powiązane za nim, praca zmiany bloku obejmowałaby ponowne wykonanie wszystkich bloków po nim.
+              </p>
+            </section>
+            
+            <section className="mt-8 text-center text-sm text-gray-400">
+              <p>To jest fragment manifestu Satoshi Nakamoto. Pełny tekst zawiera jeszcze kilka sekcji 
+              opisujących sieć, zachęty, odzyskiwanie miejsca na dysku, uproszczoną weryfikację 
+              płatności, łączenie i dzielenie wartości, prywatność, obliczenia oraz wnioski.</p>
+            </section>
+          </div>
+        </main>
+        
+        <footer className="mt-8 text-center text-gray-500 text-sm pb-8">
+          <p>© 2025 Bitcoin Whitepaper | Wszelkie prawa zastrzeżone</p>
+          <p className="mt-2">
+            <a href="#" className="hover:text-yellow-400 transition-colors">Dowiedz się więcej</a> | 
+            <a href="#" className="hover:text-yellow-400 transition-colors ml-3">Kontakt</a> | 
+            <a href="#" className="hover:text-yellow-400 transition-colors ml-3">Polityka prywatności</a>
+          </p>
+        </footer>
+      </div>
     </div>
+  );
+};
 
-    <footer>
-        <p>Źródło danych: CoinGecko API</p>
-    </footer>
-
-    <script>
-        document.getElementById('investment-form').addEventListener('submit', async function(e) {
-            e.preventDefault();
-
-            const years = parseInt(document.getElementById('years').value);
-            const frequency = document.getElementById('frequency').value;
-            const investmentAmount = parseFloat(document.getElementById('investment-amount').value);
-
-            // Wyliczamy liczbę dni na podstawie lat
-            const days = years * 365;
-
-            // Ustawiamy interwał na podstawie wybranej częstotliwości
-            let interval;
-            if (frequency === 'monthly') {
-                interval = 30; // inwestycje co miesiąc
-            } else if (frequency === 'weekly') {
-                interval = 7; // inwestycje co tydzień
-            } else if (frequency === 'daily') {
-                interval = 1; // inwestycje codzienne
-            }
-
-            try {
-                // Zaktualizowane pobieranie danych z CoinGecko
-                const API_URL = `https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=${days}`;
-                console.log(`Zapytanie do API: ${API_URL}`);
-
-                const response = await fetch(API_URL);
-
-                if (!response.ok) {
-                    throw new Error(`Błąd API: ${response.status}`);
-                }
-
-                const data = await response.json();
-                const prices = data.prices; // Lista cen [timestamp, price]
-                
-                // Sprawdzamy, czy API zwróciło ceny
-                if (!prices || prices.length === 0) {
-                    throw new Error("Brak danych o cenach");
-                }
-
-                let totalBTC = 0;
-                let totalInvestments = 0;
-
-                // Iteracja po cenach z uwzględnieniem interwałów
-                for (let i = prices.length - 1; i >= 0; i -= interval) {
-                    const price = prices[i][1]; // Cena z danego dnia
-                    const btcBought = investmentAmount / price;
-                    totalBTC += btcBought;
-                    totalInvestments += investmentAmount;
-                }
-
-                // Wyniki
-                document.getElementById('result').textContent = `Zgromadziłbyś ${totalBTC.toFixed(6)} BTC, inwestując ${investmentAmount} USD ${frequency === 'monthly' ? 'co miesiąc' : frequency === 'weekly' ? 'co tydzień' : 'codziennie'} przez ${years} lat.`;
-                document.getElementById('total-investment').textContent = `Suma wpłaconych środków: ${totalInvestments.toFixed(2)} USD.`;
-
-            } catch (error) {
-                console.error('Błąd pobierania danych lub obliczeń:', error);
-                document.getElementById('result').textContent = `Błąd: ${error.message}`;
-            }
-        });
-    </script>
-</body>
-</html>
+export default BitcoinManifestoPage;
