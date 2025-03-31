@@ -3,1231 +3,745 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bitcoin Price Spectrum</title>
+    <title>Bitcoin - Terminal Hakera</title>
     <style>
         :root {
             --border-radius-sm: 8px;
-            --primary-color: #f7931a;
-            --secondary-color: #4d4d4d;
-            --positive: #00c853;
-            --negative: #ff1744;
-            --neutral: #5f7fff;
+            --terminal-bg: #0D0208;
+            --terminal-text-primary: #23CE6B; /* Neonowy zielony */
+            --terminal-text-secondary: #FF6700; /* Pomarańczowy */
+            --terminal-text-error: #FF073A; /* Czerwony */
+            --terminal-text-dim: #3A506B; /* Przyciemniony niebieski */
+            --terminal-header-bg: #1E1E24;
+            --terminal-shadow: 0 0 10px rgba(35, 206, 107, 0.5);
+            --scanline-color: rgba(35, 206, 107, 0.05);
+            --flicker-color: rgba(255, 103, 0, 0.03);
         }
-
-        * {
+        
+        @font-face {
+            font-family: 'Hack';
+            src: url('https://cdnjs.cloudflare.com/ajax/libs/hack-font/3.3.0/web/fonts/hack-regular.woff2') format('woff2');
+            font-weight: 400;
+            font-style: normal;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             margin: 0;
             padding: 0;
-            box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-
-        body {
             background-color: #f5f5f5;
             color: #333;
             line-height: 1.6;
         }
-
+        
         .container {
             max-width: 1200px;
             margin: 0 auto;
             padding: 0 20px;
         }
-
-        /* Header - Price Spectrum */
-        .header {
+        
+        /* Header Bitcoin Terminal */
+        header {
             width: 100%;
             padding: 1rem 2rem;
             margin-bottom: 1rem;
             border-radius: var(--border-radius-sm);
             position: relative;
             z-index: 100;
-            background: linear-gradient(135deg, #3a0647, #1a0647, #0f0b5e, #0b346e, #005a8c);
-            background-size: 400% 400%;
-            color: white;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            font-family: 'Hack', 'Courier New', monospace;
+            background-color: var(--terminal-bg);
+            color: var(--terminal-text-primary);
+            box-shadow: var(--terminal-shadow);
             overflow: hidden;
         }
-
-        /* Dynamiczne tło gradientu */
-        .header::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(135deg, rgba(247, 147, 26, 0.4), rgba(255, 0, 122, 0.4), rgba(95, 127, 255, 0.4));
-            background-size: 400% 400%;
-            z-index: -1;
-            filter: blur(8px);
-            animation: gradientBG 30s ease infinite;
-            opacity: 0.7;
-            transition: all 0.5s ease;
-        }
-
-        /* Spektrum kolorów zależne od zmian ceny */
-        .header.price-up::before {
-            background: linear-gradient(135deg, rgba(0, 200, 83, 0.4), rgba(0, 230, 118, 0.4), rgba(200, 230, 201, 0.4));
-            animation: gradientBG 15s ease infinite;
-        }
-
-        .header.price-down::before {
-            background: linear-gradient(135deg, rgba(255, 23, 68, 0.4), rgba(213, 0, 0, 0.4), rgba(255, 138, 128, 0.4));
-            animation: gradientBG 15s ease infinite;
-        }
-
-        /* Animacja gradientu */
-        @keyframes gradientBG {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
-        }
-
-        /* Grid dla górnej części headera */
-        .header-top {
-            display: grid;
-            grid-template-columns: auto 1fr auto;
-            align-items: center;
-            gap: 2rem;
-            margin-bottom: 1rem;
-        }
-
-        /* Logo i tytuł */
-        .logo-title {
-            display: flex;
-            align-items: center;
-            gap: 0.8rem;
-        }
-
-        .logo {
-            width: 40px;
-            height: 40px;
-            background-color: var(--primary-color);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            transform: rotate(12deg);
-            box-shadow: 0 0 15px rgba(247, 147, 26, 0.7);
-        }
-
-        .logo span {
-            font-size: 24px;
-            transform: rotate(-12deg);
-        }
-
-        /* Cena Bitcoina */
-        .price-display {
-            text-align: center;
-            font-weight: 600;
-            font-size: 1.6rem;
-        }
-
-        .price {
-            display: flex;
-            gap: 0.5rem;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .price-change {
-            font-size: 1rem;
-            background: rgba(0, 0, 0, 0.2);
-            padding: 0.2rem 0.5rem;
-            border-radius: 4px;
-            display: flex;
-            align-items: center;
-            gap: 0.3rem;
-        }
-
-        .price-up .price-change.positive {
-            background: rgba(0, 200, 83, 0.3);
-        }
-
-        .price-down .price-change.negative {
-            background: rgba(255, 23, 68, 0.3);
-        }
-
-        /* Timeframe selector */
-        .timeframe-selector {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .timeframe-btn {
-            background: rgba(255, 255, 255, 0.1);
-            border: none;
-            color: white;
-            padding: 0.3rem 0.7rem;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .timeframe-btn.active {
-            background: rgba(255, 255, 255, 0.25);
-            font-weight: bold;
-        }
-
-        .timeframe-btn:hover {
-            background: rgba(255, 255, 255, 0.2);
-        }
-
-        /* Wskaźniki cenowe */
-        .price-indicators {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 1rem;
-            margin-top: 1rem;
-        }
-
-        .indicator {
-            background: rgba(0, 0, 0, 0.15);
-            padding: 0.7rem;
-            border-radius: var(--border-radius-sm);
-            display: flex;
-            flex-direction: column;
-        }
-
-        .indicator-title {
-            font-size: 0.8rem;
-            opacity: 0.8;
-            margin-bottom: 0.3rem;
-        }
-
-        .indicator-value {
-            font-size: 1.1rem;
-            font-weight: 600;
-        }
-
-        /* Spektrum wizualizacji */
-        .spectrum-visualization {
-            width: 100%;
-            height: 30px;
-            background: rgba(0, 0, 0, 0.15);
-            margin-top: 1rem;
-            border-radius: var(--border-radius-sm);
-            overflow: hidden;
+        
+        .terminal-wrapper {
             position: relative;
-        }
-
-        .spectrum-bar {
-            height: 100%;
-            width: 0; /* będzie ustawiane przez JS */
-            background: linear-gradient(90deg, var(--neutral), var(--primary-color));
-            transition: width 1s ease-in-out;
-        }
-
-        .price-up .spectrum-bar {
-            background: linear-gradient(90deg, var(--neutral), var(--positive));
-        }
-
-        .price-down .spectrum-bar {
-            background: linear-gradient(90deg, var(--neutral), var(--negative));
-        }
-
-        /* Pulse animation */
-        .pulse {
-            position: absolute;
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: white;
-            right: 0;
-            top: 50%;
-            transform: translateY(-50%);
-            box-shadow: 0 0 10px 2px white;
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0% { opacity: 1; transform: translateY(-50%) scale(1); }
-            70% { opacity: 0; transform: translateY(-50%) scale(3); }
-            100% { opacity: 0; transform: translateY(-50%) scale(1); }
-        }
-
-        /* Chart Section */
-        .chart-container {
-            margin-top: 1.5rem;
-            height: 250px;
-            position: relative;
-            background: rgba(0, 0, 0, 0.1);
+            min-height: 300px;
             border-radius: var(--border-radius-sm);
             overflow: hidden;
         }
-
-        .chart-loading {
+        
+        .terminal-effects {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            pointer-events: none;
+            z-index: 5;
+        }
+        
+        .scanlines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(
+                to bottom,
+                transparent 50%,
+                var(--scanline-color) 51%,
+                transparent 51%
+            );
+            background-size: 100% 4px;
+            z-index: 2;
+        }
+        
+        .flicker {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--flicker-color);
+            opacity: 0;
+            z-index: 3;
+            animation: flicker 5s infinite;
+        }
+        
+        .noise {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 250 250' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+            opacity: 0.02;
+            z-index: 1;
+        }
+        
+        .glitch {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: linear-gradient(90deg, transparent 0%, rgba(35, 206, 107, 0.2) 50%, transparent 100%);
+            background-size: 200% 100%;
+            opacity: 0;
+            z-index: 4;
+            animation: glitch-animation 6s infinite;
+        }
+        
+        .terminal-screen {
+            position: relative;
             z-index: 10;
-            color: white;
-        }
-
-        .chart-tooltip {
-            background: rgba(0, 0, 0, 0.8);
-            padding: 10px;
-            border-radius: 4px;
-            color: white;
-            font-size: 12px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
-        }
-
-        /* Bitcoin Network Data */
-        .network-data {
-            margin-top: 1.5rem;
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-            gap: 0.7rem;
-        }
-
-        .network-data .indicator {
-            background: rgba(255, 255, 255, 0.1);
-        }
-
-        /* Transaction Fees Section */
-        .transaction-fees {
-            margin-top: 1.5rem;
-        }
-
-        .fees-title {
-            font-size: 1rem;
-            margin-bottom: 0.8rem;
-            opacity: 0.8;
-            text-align: center;
-        }
-
-        .fees-grid {
-            display: flex;
-            justify-content: center;
-            gap: 1rem;
-            flex-wrap: wrap;
-        }
-
-        .fee-card {
-            background: rgba(255, 255, 255, 0.1);
-            padding: 0.7rem 1rem;
-            border-radius: var(--border-radius-sm);
-            text-align: center;
-            flex: 0 0 180px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        .fee-priority {
-            font-size: 0.8rem;
-            font-weight: 600;
-            margin-bottom: 0.3rem;
-            color: white;
-        }
-
-        .fee-value {
-            font-size: 1.1rem;
-            font-weight: 600;
         }
         
-        .fee-usd {
-            font-size: 0.9rem;
-            margin-top: 0.2rem;
-            opacity: 0.8;
-        }
-
-        .fee-time {
-            font-size: 0.75rem;
-            opacity: 0.8;
-            margin-top: 0.3rem;
-        }
-
-        .high-priority {
-            border-left: 3px solid var(--positive);
-        }
-        
-        .medium-priority {
-            border-left: 3px solid var(--primary-color);
-        }
-        
-        .low-priority {
-            border-left: 3px solid var(--negative);
-        }
-
-        .mempool-size {
-            margin-top: 0.7rem;
-            padding: 0.5rem;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 4px;
-            font-size: 0.85rem;
+        .terminal-header {
             display: flex;
             justify-content: space-between;
+            align-items: center;
+            background-color: var(--terminal-header-bg);
+            border-top-left-radius: var(--border-radius-sm);
+            border-top-right-radius: var(--border-radius-sm);
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--terminal-text-dim);
         }
-
-        /* Manifest section */
-        .manifest {
-            padding: 2rem;
-            background: white;
-            border-radius: var(--border-radius-sm);
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-            margin-top: 2rem;
-            margin-bottom: 2rem;
+        
+        .terminal-title {
+            font-size: 0.85rem;
+            font-weight: bold;
+            color: var(--terminal-text-secondary);
         }
-
-        .manifest h2 {
-            color: var(--secondary-color);
-            margin-bottom: 1rem;
-            border-bottom: 2px solid var(--primary-color);
-            padding-bottom: 0.5rem;
+        
+        .terminal-controls {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .control {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
             display: inline-block;
         }
-
-        .manifest p {
-            margin-bottom: 1rem;
-            text-align: justify;
+        
+        .minimize { background-color: #FFBE0B; }
+        .maximize { background-color: #3A86FF; }
+        .close { background-color: #FF073A; }
+        
+        .terminal-content {
+            padding: 15px;
+            max-height: 400px;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: var(--terminal-text-dim) var(--terminal-bg);
         }
-
-        /* Loading indicator */
-        .loading {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.7);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 10;
-            border-radius: var(--border-radius-sm);
+        
+        .terminal-content::-webkit-scrollbar {
+            width: 6px;
         }
-
-        .loading-spinner {
-            width: 40px;
-            height: 40px;
-            border: 4px solid rgba(255, 255, 255, 0.3);
-            border-radius: 50%;
-            border-top-color: var(--primary-color);
-            animation: spin 1s ease-in-out infinite;
+        
+        .terminal-content::-webkit-scrollbar-track {
+            background: var(--terminal-bg);
         }
-
-        .error-message {
-            color: white;
-            background: rgba(255, 0, 0, 0.7);
-            padding: 0.5rem 1rem;
+        
+        .terminal-content::-webkit-scrollbar-thumb {
+            background-color: var(--terminal-text-dim);
+            border-radius: 6px;
+        }
+        
+        .terminal-output {
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        
+        .terminal-line {
+            margin-bottom: 4px;
+            word-break: break-word;
+        }
+        
+        .command {
+            color: var(--terminal-text-secondary);
+        }
+        
+        .response {
+            color: var(--terminal-text-primary);
+        }
+        
+        .error {
+            color: var(--terminal-text-error);
+        }
+        
+        .prompt {
+            font-weight: bold;
+            margin-right: 8px;
+        }
+        
+        .cursor {
+            display: inline-block;
+            width: 8px;
+            height: 15px;
+            background-color: var(--terminal-text-primary);
+            animation: blink 1s infinite;
+            vertical-align: middle;
+        }
+        
+        .data-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .data-item {
+            padding: 8px;
+            background-color: rgba(35, 206, 107, 0.05);
             border-radius: 4px;
-            text-align: center;
-            display: none;
+            border-left: 3px solid var(--terminal-text-secondary);
+        }
+        
+        .data-label {
+            font-size: 0.75rem;
+            opacity: 0.7;
+            margin-bottom: 4px;
+        }
+        
+        .data-value {
+            font-size: 1rem;
+            font-weight: bold;
+        }
+        
+        .loading:after {
+            content: '.';
+            animation: dots 1.5s steps(5, end) infinite;
         }
 
-        @keyframes spin {
-            to { transform: rotate(360deg); }
+        .bitcoin-logo {
+            color: var(--terminal-text-secondary);
+            font-size: 0.85em;
+            line-height: 1.2;
+            margin-bottom: 10px;
         }
-
+        
+        /* Animacje */
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+        
+        @keyframes flicker {
+            0% { opacity: 0; }
+            5% { opacity: 0.3; }
+            6% { opacity: 0; }
+            10% { opacity: 0; }
+            11% { opacity: 0.15; }
+            12% { opacity: 0; }
+            55% { opacity: 0; }
+            56% { opacity: 0.3; }
+            57% { opacity: 0; }
+            92% { opacity: 0; }
+            93% { opacity: 0.25; }
+            94% { opacity: 0; }
+        }
+        
+        @keyframes glitch-animation {
+            0% { 
+                opacity: 0;
+                transform: translateX(-100%);
+            }
+            5% { 
+                opacity: 0.1;
+                transform: translateX(100%);
+            }
+            6% { opacity: 0; }
+            92% { opacity: 0; }
+            93% { 
+                opacity: 0.1;
+                transform: translateX(-100%);
+            }
+            94% { 
+                opacity: 0.1;
+                transform: translateX(100%);
+            }
+            95% { opacity: 0; }
+        }
+        
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60% { content: '...'; }
+            80%, 100% { content: '....'; }
+        }
+        
         /* Responsywność */
         @media (max-width: 768px) {
-            .header-top {
-                grid-template-columns: 1fr;
-                gap: 1rem;
-            }
-
-            .logo-title {
-                justify-content: center;
-            }
-
-            .timeframe-selector {
-                justify-content: center;
-            }
-
-            .price-indicators {
+            .data-grid {
                 grid-template-columns: 1fr;
             }
+            
+            .terminal-wrapper {
+                min-height: 250px;
+            }
+        }
+        
+        /* Wsparcie dla dark mode */
+        @media (prefers-color-scheme: dark) {
+            body {
+                background-color: #121212;
+                color: #e0e0e0;
+            }
+            
+            .manifesto {
+                background-color: #1e1e1e;
+                color: #e0e0e0;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            }
+        }
+        
+        /* Reszta stylów strony */
+        main {
+            padding: 2rem 0;
+        }
+        
+        .manifesto {
+            background-color: #fff;
+            padding: 2rem;
+            border-radius: var(--border-radius-sm);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h2 {
+            color: #f7931a;
+            margin-top: 0;
+        }
+        
+        footer {
+            text-align: center;
+            padding: 2rem;
+            background-color: #4d4d4d;
+            color: #ffffff;
+            margin-top: 2rem;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- Header z dynamicznym Price Spectrum -->
-        <header class="header" id="bitcoin-header">
-            <!-- Loading indicator -->
-            <div class="loading" id="loading">
-                <div class="loading-spinner"></div>
-            </div>
-
-            <div class="error-message" id="error-message">
-                Nie udało się pobrać danych. Wyświetlane są dane testowe.
-            </div>
-
-            <div class="header-top">
-                <div class="logo-title">
-                    <div class="logo">
-                        <span>₿</span>
-                    </div>
-                    <h1>Bitcoin Spectrum</h1>
+        <header id="bitcoin-terminal">
+            <div class="terminal-wrapper">
+                <div class="terminal-effects">
+                    <div class="scanlines"></div>
+                    <div class="flicker"></div>
+                    <div class="noise"></div>
+                    <div class="glitch"></div>
                 </div>
-
-                <div class="price-display">
-                    <div class="price">
-                        <span id="current-price">$43,270.50</span>
-                        <div class="price-change positive" id="price-change">
-                            <span id="price-change-value">+2.4%</span>
+                <div class="terminal-screen">
+                    <div class="terminal-header">
+                        <span class="terminal-title">BITCOIN NETWORK MONITOR v1.0.7</span>
+                        <div class="terminal-controls">
+                            <span class="control minimize"></span>
+                            <span class="control maximize"></span>
+                            <span class="control close"></span>
                         </div>
                     </div>
-                </div>
-
-                <div class="timeframe-selector">
-                    <button class="timeframe-btn active" data-period="24h">24h</button>
-                    <button class="timeframe-btn" data-period="7d">7d</button>
-                    <button class="timeframe-btn" data-period="30d">30d</button>
-                </div>
-            </div>
-
-            <div class="price-indicators">
-                <div class="indicator">
-                    <div class="indicator-title">Kapitalizacja rynkowa</div>
-                    <div class="indicator-value" id="market-cap">$841.5B</div>
-                </div>
-                <div class="indicator">
-                    <div class="indicator-title">Wolumen (24h)</div>
-                    <div class="indicator-value" id="volume">$28.7B</div>
-                </div>
-                <div class="indicator">
-                    <div class="indicator-title">Dominacja</div>
-                    <div class="indicator-value" id="dominance">51.2%</div>
-                </div>
-                <div class="indicator">
-                    <div class="indicator-title">ATH</div>
-                    <div class="indicator-value" id="ath">$69,000</div>
-                </div>
-            </div>
-
-            <div class="spectrum-visualization">
-                <div class="spectrum-bar" id="spectrum-bar"></div>
-                <div class="pulse"></div>
-            </div>
-
-            <!-- Sekcja wykresu ceny Bitcoin -->
-            <div class="chart-container" id="price-chart-container">
-                <div class="chart-loading" id="chart-loading">
-                    <div class="loading-spinner"></div>
-                </div>
-                <div id="price-chart"></div>
-            </div>
-
-            <!-- Sekcja danych o sieci Bitcoin -->
-            <div class="network-data">
-                <div class="indicator">
-                    <div class="indicator-title">Hash Rate</div>
-                    <div class="indicator-value" id="hash-rate">164.3 EH/s</div>
-                </div>
-                <div class="indicator">
-                    <div class="indicator-title">Trudność</div>
-                    <div class="indicator-value" id="difficulty">53.73 T</div>
-                </div>
-                <div class="indicator">
-                    <div class="indicator-title">Aktywne węzły</div>
-                    <div class="indicator-value" id="active-nodes">15,432</div>
-                </div>
-                <div class="indicator">
-                    <div class="indicator-title">Ostatni blok</div>
-                    <div class="indicator-value" id="latest-block">#822,045</div>
-                </div>
-                <div class="indicator">
-                    <div class="indicator-title">Czas bloku</div>
-                    <div class="indicator-value" id="block-time">9.8 min</div>
-                </div>
-                <div class="indicator">
-                    <div class="indicator-title">Nagroda</div>
-                    <div class="indicator-value" id="block-reward">3.125 BTC</div>
-                </div>
-            </div>
-
-            <!-- Sekcja opłat transakcyjnych -->
-            <div class="transaction-fees">
-                <div class="fees-title">Sugerowane opłaty transakcyjne</div>
-                <div class="fees-grid">
-                    <div class="fee-card high-priority">
-                        <div class="fee-priority">Wysoki priorytet</div>
-                        <div class="fee-value" id="high-fee">25 sat/vB</div>
-                        <div class="fee-usd" id="high-fee-usd">~$2.50</div>
-                        <div class="fee-time">~10 minut</div>
+                    <div class="terminal-content">
+                        <div class="terminal-output" id="terminal-output"></div>
                     </div>
-                    <div class="fee-card medium-priority">
-                        <div class="fee-priority">Średni priorytet</div>
-                        <div class="fee-value" id="medium-fee">12 sat/vB</div>
-                        <div class="fee-usd" id="medium-fee-usd">~$1.20</div>
-                        <div class="fee-time">~30 minut</div>
-                    </div>
-                    <div class="fee-card low-priority">
-                        <div class="fee-priority">Niski priorytet</div>
-                        <div class="fee-value" id="low-fee">5 sat/vB</div>
-                        <div class="fee-usd" id="low-fee-usd">~$0.50</div>
-                        <div class="fee-time">~60 minut</div>
-                    </div>
-                </div>
-                <div class="mempool-size">
-                    <span>Mempool: <span id="mempool-size">24,563 transakcji</span></span>
-                    <span>Rozmiar: <span id="mempool-mb">42.7 MB</span></span>
                 </div>
             </div>
         </header>
-
-        <!-- Manifest Satoshiego Nakamoto -->
-        <section class="manifest">
-            <h2>Manifest Satoshiego Nakamoto</h2>
-            <p>Bitcoin: A Peer-to-Peer Electronic Cash System</p>
-            <p>Abstrakt. Czysto peer-to-peer wersja elektronicznej gotówki pozwoliłaby na przesyłanie płatności online bezpośrednio od jednej strony do drugiej bez przechodzenia przez instytucję finansową. Podpisy cyfrowe stanowią część rozwiązania, ale główne korzyści są utracone, jeśli zaufana trzecia strona jest nadal wymagana do zapobiegania podwójnemu wydawaniu. Proponujemy rozwiązanie problemu podwójnego wydawania przy użyciu sieci peer-to-peer. Sieć znaczników czasowych transakcje poprzez hashowanie ich w trwający łańcuch dowodów pracy opartych na hash, tworząc zapis, który nie może być zmieniony bez ponownego wykonania dowodu pracy.</p>
-            <p>Najdłuższy łańcuch nie tylko służy jako dowód sekwencji zdarzeń, których był świadkiem, ale dowód na to, że pochodzi z największej puli mocy CPU. Tak długo jak większość mocy CPU jest kontrolowana przez węzły, które nie współpracują w celu atakowania sieci, będą one generować najdłuższy łańcuch i wyprzedzać atakujących. Sama sieć wymaga minimalnej struktury. Wiadomości są rozgłaszane na zasadzie najlepszych wysiłków, a węzły mogą opuszczać i dołączać do sieci według uznania, akceptując najdłuższy łańcuch dowodu pracy jako dowód tego, co się wydarzyło podczas ich nieobecności.</p>
-            <p>Wprowadzamy elektroniczny system pieniężny oparty całkowicie na kryptografii zamiast na zaufaniu, umożliwiający dowolnym dwóm stronom zawieranie transakcji bezpośrednio między sobą bez potrzeby zaufanej trzeciej strony. Transakcje, które są obliczeniowo niepraktyczne do odwrócenia, chroniłyby sprzedawców przed oszustwami, a rutynowe mechanizmy depozytów powierniczych mogłyby być łatwo zaimplementowane w celu ochrony kupujących. W tym artykule proponujemy rozwiązanie problemu podwójnego wydawania przy użyciu rozproszonego serwera znaczników czasowych peer-to-peer w celu wygenerowania obliczeniowego dowodu chronologicznego porządku transakcji.</p>
-            <p>Tradycyjne modele prywatności ograniczają dostęp do informacji stronom uczestniczącym i stronie trzeciej. Konieczność ogłaszania wszystkich transakcji publicznie wyklucza tę metodę, ale prywatność może być nadal zachowana przez przerwanie przepływu informacji w innym miejscu: przez utrzymanie kluczy publicznych w anonimowości. Publiczność może widzieć, że ktoś wysyła kwotę do kogoś innego, ale bez informacji łączących transakcję z kimkolwiek.</p>
-            <p>31 października 2008, Satoshi Nakamoto</p>
-        </section>
+        
+        <main>
+            <div class="manifesto">
+                <h2>Bitcoin: Elektroniczny System Pieniężny Peer-to-Peer</h2>
+                <p><em>Satoshi Nakamoto, 31 października 2008</em></p>
+                
+                <p>Abstrakt. Czysto peer-to-peer wersja elektronicznej gotówki pozwoliłaby na przesyłanie płatności online bezpośrednio od jednej strony do drugiej bez korzystania z instytucji finansowej. Podpisy cyfrowe stanowią część rozwiązania, ale główne korzyści są tracone, jeśli nadal potrzebna jest zaufana strona trzecia, aby zapobiec podwójnemu wydawaniu. Proponujemy rozwiązanie problemu podwójnego wydawania przy użyciu sieci peer-to-peer. Sieć znakuje czasem transakcje, haszując je w trwający łańcuch dowodu pracy oparty na hashu, tworząc zapis, który nie może zostać zmieniony bez ponownego wykonania dowodu pracy.</p>
+                
+                <p>Najdłuższy łańcuch służy nie tylko jako dowód sekwencji zaobserwowanych zdarzeń, ale także jako dowód, że pochodzi z największej puli mocy obliczeniowej. Dopóki większość mocy obliczeniowej jest kontrolowana przez węzły, które nie współpracują, aby zaatakować sieć, będą one generować najdłuższy łańcuch i wyprzedzać atakujących. Sama sieć wymaga minimalnej struktury. Wiadomości są rozgłaszane na zasadzie best effort, a węzły mogą opuszczać i ponownie dołączać do sieci według własnego uznania, akceptując najdłuższy łańcuch dowodu pracy jako dowód tego, co wydarzyło się podczas ich nieobecności.</p>
+                
+                <h3>1. Wprowadzenie</h3>
+                <p>Handel w Internecie polegał prawie wyłącznie na instytucjach finansowych służących jako zaufane strony trzecie do przetwarzania płatności elektronicznych. Chociaż system działa wystarczająco dobrze dla większości transakcji, nadal cierpi na wrodzone słabości modelu opartego na zaufaniu. Całkowicie nieodwracalne transakcje nie są naprawdę możliwe, ponieważ instytucje finansowe nie mogą uniknąć mediacji w sporach.</p>
+                
+                <p>Koszt mediacji zwiększa koszty transakcji, ograniczając minimalny praktyczny rozmiar transakcji i odcinając możliwość drobnych transakcji okazjonalnych, a istnieje szerszy koszt utraty możliwości dokonywania nieodwracalnych płatności za nieodwracalne usługi. Wraz z możliwością cofnięcia, potrzeba zaufania się rozprzestrzenia. Handlowcy muszą być ostrożni w stosunku do swoich klientów, nękając ich o więcej informacji, niż byłoby to konieczne w innym przypadku.</p>
+                
+                <p>Pewien procent oszustw jest akceptowany jako nieunikniony. Te koszty i niepewności płatności można uniknąć przez użycie fizycznej waluty, ale nie istnieje mechanizm dokonywania płatności przez kanał komunikacyjny bez zaufanej strony.</p>
+                
+                <p>Potrzebny jest elektroniczny system płatności oparty na dowodzie kryptograficznym zamiast zaufania, pozwalający dwóm chętnym stronom na bezpośrednie transakcje bez potrzeby zaufanej strony trzeciej. Transakcje, które są obliczeniowo niepraktyczne do odwrócenia, chroniłyby sprzedawców przed oszustwami, a rutynowe mechanizmy depozytu escrow mogłyby być łatwo zaimplementowane w celu ochrony kupujących.</p>
+            </div>
+        </main>
+        
+        <footer>
+            <p>© 2025 Bitcoin - Wszystkie prawa zastrzeżone</p>
+        </footer>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/recharts/2.5.0/recharts.min.js"></script>
     <script>
-        // Funkcje do obsługi danych Bitcoina
-        const bitcoinHeader = {
-            // Elementy interfejsu
-            elements: {
-                header: document.getElementById('bitcoin-header'),
-                currentPrice: document.getElementById('current-price'),
-                priceChange: document.getElementById('price-change'),
-                priceChangeValue: document.getElementById('price-change-value'),
-                marketCap: document.getElementById('market-cap'),
-                volume: document.getElementById('volume'),
-                dominance: document.getElementById('dominance'),
-                ath: document.getElementById('ath'),
-                spectrumBar: document.getElementById('spectrum-bar'),
-                timeframeButtons: document.querySelectorAll('.timeframe-btn'),
-                loading: document.getElementById('loading'),
-                errorMessage: document.getElementById('error-message'),
-                
-                // Nowe elementy
-                priceChart: document.getElementById('price-chart'),
-                chartLoading: document.getElementById('chart-loading'),
-                hashRate: document.getElementById('hash-rate'),
-                difficulty: document.getElementById('difficulty'),
-                activeNodes: document.getElementById('active-nodes'),
-                latestBlock: document.getElementById('latest-block'),
-                blockTime: document.getElementById('block-time'),
-                blockReward: document.getElementById('block-reward'),
-                
-                // Elementy dla opłat transakcyjnych
-                highFee: document.getElementById('high-fee'),
-                mediumFee: document.getElementById('medium-fee'),
-                lowFee: document.getElementById('low-fee'),
-                mempoolSize: document.getElementById('mempool-size'),
-                mempoolMb: document.getElementById('mempool-mb')
-            },
+        // Klasa obsługująca efekt pisania w terminalu
+        class TerminalTyper {
+            constructor(element, options = {}) {
+                this.element = document.querySelector(element);
+                this.speed = options.speed || 30;
+                this.delay = options.delay || 1000;
+                this.queue = [];
+                this.isTyping = false;
+            }
 
-            // Dane testowe jako fallback
-            fallbackData: {
-                currentPrice: 43270.50,
-                priceChange: {
-                    '24h': 2.4,
-                    '7d': -1.8,
-                    '30d': 5.6
-                },
-                marketCap: 841500000000,
-                volume: 28700000000,
-                dominance: 51.2,
-                ath: 69000,
-                
-                // Dane o sieci Bitcoin (fallback)
-                networkData: {
-                    hashRate: "164.3 EH/s",
-                    difficulty: "53.73 T",
-                    activeNodes: "15,432",
-                    latestBlock: "#822,045",
-                    blockTime: "9.8 min",
-                    blockReward: "3.125 BTC"
-                },
-                
-                // Dane o opłatach transakcyjnych (fallback)
-                feeData: {
-                    highFee: "25 sat/vB",
-                    mediumFee: "12 sat/vB",
-                    lowFee: "5 sat/vB",
-                    highFeeUsd: "~$2.50",
-                    mediumFeeUsd: "~$1.20",
-                    lowFeeUsd: "~$0.50",
-                    mempoolSize: "24,563 transakcji",
-                    mempoolMb: "42.7 MB"
-                },
-                
-                // Dane do wykresu (fallback)
-                chartData: {
-                    '24h': generateFallbackChartData(24, 43270.50, 2.4),
-                    '7d': generateFallbackChartData(168, 43270.50, -1.8),
-                    '30d': generateFallbackChartData(720, 43270.50, 5.6)
-                }
-            },
-            
-            // Aktualna cena BTC
-            currentPrice: null,
+            addToQueue(text, isCommand = false, className = '', callback = null) {
+                this.queue.push({ text, isCommand, className, callback });
+                if (!this.isTyping) this.processQueue();
+            }
 
-            // Dane wykresu
-            chartData: null,
-
-            // Aktualnie wybrany okres czasowy
-            currentTimeframe: '24h',
-            init: function() {
-                this.fetchBitcoinData();
-                this.fetchHistoricalData();
-                this.fetchNetworkData();
-                this.fetchTransactionFees();
-                this.setupEventListeners();
-                this.animateSpectrumBar();
-
-                // Ustawienie interwału odświeżania danych
-                setInterval(() => this.fetchBitcoinData(), 120000);
-                setInterval(() => this.fetchNetworkData(), 300000); // Co 5 minut
-                setInterval(() => this.fetchTransactionFees(), 180000); // Co 3 minuty
-            },
-
-            // Pobranie danych o Bitcoinie z API CoinGecko
-            fetchBitcoinData: function() {
-                this.showLoading();
-
-                fetch('https://api.coingecko.com/api/v3/coins/bitcoin?localization=false&tickers=false&community_data=false&developer_data=false')
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error('Network response was not ok');
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        this.processApiData(data);
-                        this.hideLoading();
-                    })
-                    .catch(error => {
-                        console.error('Error fetching Bitcoin data:', error);
-                        this.useFallbackData();
-                        this.showError();
-                        setTimeout(() => this.hideError(), 5000);
-                    });
-            },
-            
-            // Pobranie danych historycznych dla wykresu
-            fetchHistoricalData: function() {
-                document.getElementById('chart-loading').style.display = 'flex';
-                
-                // Pobieramy dane dla wszystkich przedziałów czasowych
-                const timeframes = {
-                    '24h': 1,
-                    '7d': 7,
-                    '30d': 30
-                };
-                
-                // Pobieranie danych dla każdego timeframe
-                Object.entries(timeframes).forEach(([timeframe, days]) => {
-                    fetch(`https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=${days}`)
-                        .then(response => {
-                            if (!response.ok) {
-                                throw new Error('Network response was not ok');
-                            }
-                            return response.json();
-                        })
-                        .then(data => {
-                            // Przetworzenie danych dla wykresu
-                            if (!this.chartData) {
-                                this.chartData = {};
-                            }
-                            
-                            this.chartData[timeframe] = data.prices.map(price => ({
-                                time: new Date(price[0]),
-                                price: price[1]
-                            }));
-                            
-                            // Renderowanie wykresu dla aktualnego timeframe
-                            if (timeframe === this.currentTimeframe) {
-                                this.renderChart(this.chartData[timeframe]);
-                            }
-                            
-                            document.getElementById('chart-loading').style.display = 'none';
-                        })
-                        .catch(error => {
-                            console.error(`Error fetching historical data for ${timeframe}:`, error);
-                            // Używamy danych fallback dla wykresu
-                            if (!this.chartData) {
-                                this.chartData = this.fallbackData.chartData;
-                            }
-                            
-                            this.renderChart(this.chartData[this.currentTimeframe]);
-                            document.getElementById('chart-loading').style.display = 'none';
-                        });
-                });
-            },
-            
-            // Pobranie danych o sieci Bitcoin
-            fetchNetworkData: function() {
-                // W rzeczywistej implementacji pobieralibyśmy te dane z API jak Blockchain.info lub Blockchair
-                // Dla przykładu, użyjemy API Blockchain.info
-                fetch('https://api.blockchain.info/stats')
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error('Network response was not ok');
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        // Aktualizacja danych o sieci
-                        this.updateNetworkData({
-                            hashRate: `${(data.hash_rate / 1e18).toFixed(1)} EH/s`,
-                            difficulty: `${(data.difficulty / 1e12).toFixed(2)} T`,
-                            activeNodes: "~15,000", // To zazwyczaj trzeba pobrać z innego API
-                            latestBlock: `#${data.n_blocks_total.toLocaleString()}`,
-                            blockTime: `${data.minutes_between_blocks.toFixed(1)} min`,
-                            blockReward: "3.125 BTC" // Stała po halving 2024
-                        });
-                    })
-                    .catch(error => {
-                        console.error('Error fetching network data:', error);
-                        // Używamy danych fallback dla sieci
-                        this.updateNetworkData(this.fallbackData.networkData);
-                    });
-            },
-            
-            // Pobranie danych o opłatach transakcyjnych
-            fetchTransactionFees: function() {
-                // W rzeczywistej implementacji pobieralibyśmy te dane z API jak mempool.space
-                // Dla przykładu, użyjemy API mempool.space
-                fetch('https://mempool.space/api/v1/fees/recommended')
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error('Network response was not ok');
-                        }
-                        return response.json();
-                    })
-                    .then(feeData => {
-                        // Pobieramy też informacje o mempool
-                        return fetch('https://mempool.space/api/mempool')
-                            .then(response => {
-                                if (!response.ok) {
-                                    throw new Error('Network response was not ok');
-                                }
-                                return response.json();
-                            })
-                            .then(mempoolData => {
-                                // Aktualizacja danych o opłatach transakcyjnych
-                                const feeData = {
-                                    highFee: `${feeData.fastestFee} sat/vB`,
-                                    mediumFee: `${feeData.halfHourFee} sat/vB`,
-                                    lowFee: `${feeData.economyFee} sat/vB`,
-                                    mempoolSize: `${mempoolData.count.toLocaleString()} transakcji`,
-                                    mempoolMb: `${(mempoolData.vsize / 1000000).toFixed(1)} MB`
-                                };
-                                
-                                this.updateTransactionFees(feeData);
-                                
-                                // Aktualizacja przeliczenia na USD
-                                if (this.currentPrice) {
-                                    this.updateTransactionFeesUsd(this.currentPrice);
-                                }
-                            });
-                    })
-                    .catch(error => {
-                        console.error('Error fetching transaction fees:', error);
-                        // Używamy danych fallback dla opłat
-                        this.updateTransactionFees(this.fallbackData.feeData);
-                    });
-            },
-
-            // Przetworzenie danych z API
-            processApiData: function(data) {
-                const price = data.market_data.current_price.usd;
-                this.currentPrice = price; // Zapisujemy aktualną cenę
-                
-                const priceChange = {
-                    '24h': data.market_data.price_change_percentage_24h,
-                    '7d': data.market_data.price_change_percentage_7d,
-                    '30d': data.market_data.price_change_percentage_30d
-                };
-                const marketCap = data.market_data.market_cap.usd;
-                const volume = data.market_data.total_volume.usd;
-                const ath = data.market_data.ath.usd;
-
-                // Aktualizacja UI
-                this.updateUI({
-                    currentPrice: price,
-                    priceChange: priceChange,
-                    marketCap: marketCap,
-                    volume: volume,
-                    dominance: 51.2, // To jest wartość przykładowa, CoinGecko nie dostarcza bezpośrednio tego parametru
-                    ath: ath
-                });
-                
-                // Aktualizacja przeliczenia opłat na USD, jeśli dane o opłatach są dostępne
-                this.updateTransactionFeesUsd(price);
-            },
-
-            // Użycie danych testowych w przypadku braku dostępu do API
-            useFallbackData: function() {
-                this.updateUI(this.fallbackData);
-                this.updateNetworkData(this.fallbackData.networkData);
-                this.updateTransactionFees(this.fallbackData.feeData);
-                if (!this.chartData) {
-                    this.chartData = this.fallbackData.chartData;
-                    this.renderChart(this.chartData[this.currentTimeframe]);
-                }
-                this.hideLoading();
-            },
-            
-            // Aktualizacja danych o sieci
-            updateNetworkData: function(data) {
-                this.elements.hashRate.textContent = data.hashRate;
-                this.elements.difficulty.textContent = data.difficulty;
-                this.elements.activeNodes.textContent = data.activeNodes;
-                this.elements.latestBlock.textContent = data.latestBlock;
-                this.elements.blockTime.textContent = data.blockTime;
-                this.elements.blockReward.textContent = data.blockReward;
-            },
-            
-            // Funkcja do obliczania opłaty w USD na podstawie sat/vB
-            calculateFeeInUsd: function(satVbRate, btcPrice) {
-                // Zakładamy średni rozmiar transakcji Bitcoin - 250 vBytes
-                const avgTransactionSize = 250;
-                // Całkowita opłata w satoshi
-                const totalSats = satVbRate * avgTransactionSize;
-                // Konwersja satoshi na BTC (1 sat = 0.00000001 BTC)
-                const btcAmount = totalSats * 0.00000001;
-                // Konwersja BTC na USD
-                const usdAmount = btcAmount * btcPrice;
-                
-                return usdAmount;
-            },
-            
-            // Aktualizacja przeliczenia opłat na USD
-            updateTransactionFeesUsd: function(btcPrice) {
-                // Pobieramy wartości opłat (tylko liczby)
-                const getNumericValue = (str) => {
-                    const match = str.match(/(\d+)/);
-                    return match ? parseInt(match[1]) : 0;
-                };
-                
-                const highFee = getNumericValue(this.elements.highFee.textContent);
-                const mediumFee = getNumericValue(this.elements.mediumFee.textContent);
-                const lowFee = getNumericValue(this.elements.lowFee.textContent);
-                
-                // Obliczamy wartości w USD
-                const highFeeUsd = this.calculateFeeInUsd(highFee, btcPrice);
-                const mediumFeeUsd = this.calculateFeeInUsd(mediumFee, btcPrice);
-                const lowFeeUsd = this.calculateFeeInUsd(lowFee, btcPrice);
-                
-                // Aktualizujemy UI
-                this.elements.highFeeUsd.textContent = `~${highFeeUsd.toFixed(2)}`;
-                this.elements.mediumFeeUsd.textContent = `~${mediumFeeUsd.toFixed(2)}`;
-                this.elements.lowFeeUsd.textContent = `~${lowFeeUsd.toFixed(2)}`;
-            },
-            
-            // Aktualizacja danych o opłatach transakcyjnych
-            updateTransactionFees: function(data) {
-                this.elements.highFee.textContent = data.highFee;
-                this.elements.mediumFee.textContent = data.mediumFee;
-                this.elements.lowFee.textContent = data.lowFee;
-                this.elements.mempoolSize.textContent = data.mempoolSize;
-                this.elements.mempoolMb.textContent = data.mempoolMb;
-                
-                // Aktualizacja wartości USD jeśli dane mają te pola
-                if (data.highFeeUsd) this.elements.highFeeUsd.textContent = data.highFeeUsd;
-                if (data.mediumFeeUsd) this.elements.mediumFeeUsd.textContent = data.mediumFeeUsd;
-                if (data.lowFeeUsd) this.elements.lowFeeUsd.textContent = data.lowFeeUsd;
-            },
-            renderChart: function(data) {
-                if (!data || !data.length) return;
-                
-                // Przygotowanie danych dla wykresu
-                const chartEl = this.elements.priceChart;
-                
-                // Sprawdzamy, czy Recharts jest dostępny
-                if (typeof Recharts === 'undefined') {
-                    console.error('Recharts library not loaded!');
-                    chartEl.innerHTML = '<div style="color: white; text-align: center; padding: 20px;">Nie można załadować wykresu</div>';
+            async processQueue() {
+                if (this.queue.length === 0) {
+                    this.isTyping = false;
                     return;
                 }
                 
-                // Czyszczenie kontenera
-                chartEl.innerHTML = '';
+                this.isTyping = true;
+                const item = this.queue.shift();
                 
-                // Wyznaczenie min i max wartości dla skali
-                const prices = data.map(d => d.price);
-                const minPrice = Math.min(...prices) * 0.998;
-                const maxPrice = Math.max(...prices) * 1.002;
+                // Dodaj nową linię
+                const line = document.createElement('div');
+                line.className = `terminal-line ${item.className} ${item.isCommand ? 'command' : 'response'}`;
                 
-                // Formatowanie daty w zależności od timeframe
-                const formatDate = (date) => {
-                    if (this.currentTimeframe === '24h') {
-                        return date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                    } else if (this.currentTimeframe === '7d') {
-                        return date.toLocaleDateString([], {month: 'short', day: 'numeric'});
-                    } else {
-                        return date.toLocaleDateString([], {month: 'short', day: 'numeric'});
-                    }
-                };
-                
-                // Formatowanie tooltipa
-                const CustomTooltip = ({ active, payload }) => {
-                    if (active && payload && payload.length) {
-                        const dataPoint = payload[0].payload;
-                        const formattedDate = dataPoint.time.toLocaleString([], {
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                        });
-                        
-                        return (
-                            `<div class="chart-tooltip">
-                                <div>${formattedDate}</div>
-                                <div>${dataPoint.price.toLocaleString('en-US', {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2
-                                })}</div>
-                            </div>`
-                        );
-                    }
-                    return null;
-                };
-                
-                // Tworzenie gradientu dla obszaru pod linią
-                const gradientId = 'colorPrice';
-                const svgTag = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-                svgTag.setAttribute('height', '0');
-                svgTag.setAttribute('width', '0');
-                svgTag.style.position = 'absolute';
-                svgTag.innerHTML = `
-                    <defs>
-                        <linearGradient id="${gradientId}" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="${
-                                data[0].price <= data[data.length - 1].price ? 
-                                'rgba(0, 200, 83, 0.8)' : 'rgba(255, 23, 68, 0.8)'
-                            }" stopOpacity="0.3"/>
-                            <stop offset="95%" stopColor="${
-                                data[0].price <= data[data.length - 1].price ? 
-                                'rgba(0, 200, 83, 0.8)' : 'rgba(255, 23, 68, 0.8)'
-                            }" stopOpacity="0"/>
-                        </linearGradient>
-                    </defs>
-                `;
-                document.body.appendChild(svgTag);
-                
-                // Określenie koloru linii na podstawie zmiany ceny
-                const lineColor = data[0].price <= data[data.length - 1].price ? 
-                    'rgba(0, 200, 83, 1)' : 'rgba(255, 23, 68, 1)';
-                
-                // Renderowanie wykresu za pomocą Recharts
-                const {
-                    ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, 
-                    Tooltip, Area, AreaChart
-                } = Recharts;
-                
-                // Wykres
-                const chart = new ResponsiveContainer({
-                    width: '100%',
-                    height: '100%'
-                });
-                
-                const areaChart = new AreaChart({
-                    data: data,
-                    margin: { top: 10, right: 20, left: 20, bottom: 10 }
-                });
-                
-                const cartesianGrid = new CartesianGrid({
-                    strokeDasharray: '3 3',
-                    stroke: 'rgba(255, 255, 255, 0.1)'
-                });
-                
-                const xaxis = new XAxis({
-                    dataKey: 'time',
-                    tickFormatter: formatDate,
-                    tickMargin: 10,
-                    tickCount: 6,
-                    stroke: 'rgba(255, 255, 255, 0.5)',
-                    tick: { fill: 'white', fontSize: 12 }
-                });
-                
-                const yaxis = new YAxis({
-                    domain: [minPrice, maxPrice],
-                    tickFormatter: (value) => `${Math.round(value).toLocaleString()}`,
-                    stroke: 'rgba(255, 255, 255, 0.5)',
-                    tick: { fill: 'white', fontSize: 12 }
-                });
-                
-                const tooltip = new Tooltip({
-                    content: CustomTooltip
-                });
-                
-                const area = new Area({
-                    type: 'monotone',
-                    dataKey: 'price',
-                    stroke: lineColor,
-                    strokeWidth: 2,
-                    fillOpacity: 1,
-                    fill: `url(#${gradientId})`,
-                    dot: false,
-                    activeDot: { r: 6, stroke: 'white', strokeWidth: 2, fill: lineColor }
-                });
-                
-                // Dodajemy elementy do wykresu
-                areaChart.appendChild(cartesianGrid);
-                areaChart.appendChild(xaxis);
-                areaChart.appendChild(yaxis);
-                areaChart.appendChild(tooltip);
-                areaChart.appendChild(area);
-                chart.appendChild(areaChart);
-                
-                // Renderowanie do kontenera
-                chartEl.appendChild(chart);
-            },
-
-            // Aktualizacja interfejsu użytkownika
-            updateUI: function(data) {
-                // Formatowanie ceny
-                this.elements.currentPrice.textContent = `$${data.currentPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-                
-                // Aktualizacja procentowej zmiany ceny dla wybranego okresu
-                const change = data.priceChange[this.currentTimeframe];
-                this.elements.priceChangeValue.textContent = `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
-                
-                // Ustawienie klasy dla zmiany ceny (pozytywna/negatywna)
-                if (change >= 0) {
-                    this.elements.priceChange.classList.add('positive');
-                    this.elements.priceChange.classList.remove('negative');
-                    this.elements.header.classList.add('price-up');
-                    this.elements.header.classList.remove('price-down');
+                if (item.isCommand) {
+                    line.innerHTML = '<span class="prompt">btc@network:~$</span> ';
+                    this.element.appendChild(line);
+                    await this.typeText(line, item.text);
                 } else {
-                    this.elements.priceChange.classList.add('negative');
-                    this.elements.priceChange.classList.remove('positive');
-                    this.elements.header.classList.add('price-down');
-                    this.elements.header.classList.remove('price-up');
+                    this.element.appendChild(line);
+                    line.innerHTML = item.text;
                 }
                 
-                // Aktualizacja wskaźników
-                this.elements.marketCap.textContent = `$${this.formatLargeNumber(data.marketCap)}`;
-                this.elements.volume.textContent = `$${this.formatLargeNumber(data.volume)}`;
-                this.elements.dominance.textContent = `${data.dominance}%`;
-                this.elements.ath.textContent = `$${data.ath.toLocaleString('en-US')}`;
+                this.element.scrollTop = this.element.scrollHeight;
                 
-                // Animacja spektrum
-                this.updateSpectrumBar(change);
-            },
-
-            // Formatowanie dużych liczb (np. 1200000000 -> 1.2B)
-            formatLargeNumber: function(num) {
-                if (num >= 1e12) return `${(num / 1e12).toFixed(1)}T`;
-                if (num >= 1e9) return `${(num / 1e9).toFixed(1)}B`;
-                if (num >= 1e6) return `${(num / 1e6).toFixed(1)}M`;
-                if (num >= 1e3) return `${(num / 1e3).toFixed(1)}K`;
-                return num.toString();
-            },
-
-            // Ustawienie nasłuchiwaczy zdarzeń
-            setupEventListeners: function() {
-                this.elements.timeframeButtons.forEach(button => {
-                    button.addEventListener('click', () => {
-                        // Aktualizacja aktywnego przycisku
-                        this.elements.timeframeButtons.forEach(btn => btn.classList.remove('active'));
-                        button.classList.add('active');
-                        
-                        // Zmiana okresu czasowego
-                        this.currentTimeframe = button.getAttribute('data-period');
-                        
-                        // Ponowne pobranie danych
-                        this.fetchBitcoinData();
-                        
-                        // Aktualizacja wykresu dla nowego okresu
-                        if (this.chartData && this.chartData[this.currentTimeframe]) {
-                            this.renderChart(this.chartData[this.currentTimeframe]);
-                        } else {
-                            // Jeśli nie mamy danych dla tego okresu, pobieramy je
-                            this.fetchHistoricalData();
-                        }
-                    });
-                });
-            },
-
-            // Aktualizacja wizualizacji spektrum
-            updateSpectrumBar: function(changePercentage) {
-                // Obliczenie szerokości paska na podstawie zmiany procentowej
-                // Maksymalny zakres +/-10% dla pełnej szerokości
-                const normalizedChange = Math.min(Math.max(changePercentage, -10), 10);
-                const width = 50 + (normalizedChange * 5); // 50% to środek, +/-50% to zakres
-                this.elements.spectrumBar.style.width = `${width}%`;
-            },
-
-            // Animacja paska spektrum podczas ładowania
-            animateSpectrumBar: function() {
-                let width = 0;
-                const interval = setInterval(() => {
-                    if (width >= 100) {
-                        clearInterval(interval);
-                    } else {
-                        width += 1;
-                        this.elements.spectrumBar.style.width = `${width}%`;
-                    }
-                }, 30);
-            },
-
-            // Pokaż animację ładowania
-            showLoading: function() {
-                this.elements.loading.style.display = 'flex';
-            },
-
-            // Ukryj animację ładowania
-            hideLoading: function() {
-                this.elements.loading.style.display = 'none';
-            },
-
-            // Pokaż komunikat o błędzie
-            showError: function() {
-                this.elements.errorMessage.style.display = 'block';
-            },
-
-            // Ukryj komunikat o błędzie
-            hideError: function() {
-                this.elements.errorMessage.style.display = 'none';
-            }
-        };
-
-        // Funkcja do generowania danych testowych dla wykresu
-        function generateFallbackChartData(hours, basePrice, changePercent) {
-            const now = new Date();
-            const data = [];
-            const volatility = 0.005; // 0.5% zmienności między punktami
-            const direction = changePercent >= 0 ? 1 : -1;
-            const totalChange = basePrice * (changePercent / 100);
-            const hourlyChange = totalChange / hours;
-            
-            for (let i = 0; i < hours; i++) {
-                const timestamp = new Date(now.getTime() - (hours - i) * 60 * 60 * 1000);
-                // Dodajemy losową zmienność, ale zachowujemy ogólny trend
-                const randomFactor = (Math.random() - 0.5) * volatility;
-                const price = basePrice - (hours - i) * hourlyChange + basePrice * randomFactor;
+                if (item.callback) item.callback();
                 
-                data.push({
-                    time: timestamp,
-                    price: price
-                });
+                // Opóźnienie przed następną linią
+                await this.sleep(this.delay);
+                this.processQueue();
             }
             
-            // Dodajemy ostatni punkt (teraz) z dokładną wartością
-            data.push({
-                time: now,
-                price: basePrice
-            });
+            async typeText(element, text) {
+                const cursorSpan = document.createElement('span');
+                cursorSpan.className = 'cursor';
+                element.appendChild(cursorSpan);
+                
+                for (let i = 0; i < text.length; i++) {
+                    const char = text.charAt(i);
+                    const charSpan = document.createElement('span');
+                    charSpan.textContent = char;
+                    element.insertBefore(charSpan, cursorSpan);
+                    
+                    // Różna prędkość dla różnych znaków
+                    const randomSpeed = this.speed + Math.random() * 50;
+                    await this.sleep(randomSpeed);
+                }
+                
+                element.removeChild(cursorSpan);
+                return Promise.resolve();
+            }
             
-            return data;
+            sleep(ms) {
+                return new Promise(resolve => setTimeout(resolve, ms));
+            }
+            
+            clear() {
+                this.element.innerHTML = '';
+            }
         }
 
-        // Inicjalizacja po załadowaniu strony
+        // Klasa do zarządzania danymi o Bitcoinie
+        class BitcoinDataService {
+            constructor() {
+                // Symulowane dane (w prawdziwej implementacji pobieralibyśmy je z API)
+                this.data = {
+                    price: 42789.56,
+                    priceChange24h: 3.27,
+                    marketCap: 843756982175,
+                    volume24h: 27893452167,
+                    blockHeight: 837492,
+                    lastBlockHash: "000000000000000000067a97a2a0eb3d70fd895be1f9cba969b43d25d5209c2a",
+                    difficulty: 73234476465543,
+                    hashrate: 480523844,
+                    unconfirmedTx: 3267,
+                    lastUpdate: new Date()
+                };
+                
+                // Symulacja aktualizacji danych
+                setInterval(() => this.updateData(), 30000);
+            }
+            
+            updateData() {
+                // Symulujemy zmiany danych
+                const priceChange = (Math.random() - 0.48) * 200;
+                this.data.price += priceChange;
+                this.data.priceChange24h = (Math.random() - 0.4) * 8;
+                this.data.marketCap = this.data.price * 19700000; // Przybliżona liczba BTC w obiegu
+                this.data.volume24h = 25000000000 + Math.random() * 10000000000;
+                this.data.blockHeight += Math.floor(Math.random() * 3);
+                this.data.lastBlockHash = this.generateRandomHash();
+                this.data.unconfirmedTx = 2000 + Math.floor(Math.random() * 5000);
+                this.data.lastUpdate = new Date();
+                
+                // Powiadom o aktualizacji
+                document.dispatchEvent(new CustomEvent('bitcoinDataUpdated'));
+            }
+            
+            getData() {
+                return { ...this.data };
+            }
+            
+            generateRandomHash() {
+                const chars = '0123456789abcdef';
+                let hash = '00000000000000000000';
+                for (let i = 0; i < 44; i++) {
+                    hash += chars.charAt(Math.floor(Math.random() * chars.length));
+                }
+                return hash;
+            }
+            
+            formatNumber(num, decimals = 2) {
+                if (num > 1000000000) {
+                    return (num / 1000000000).toFixed(decimals) + 'B';
+                } else if (num > 1000000) {
+                    return (num / 1000000).toFixed(decimals) + 'M';
+                } else if (num > 1000) {
+                    return (num / 1000).toFixed(decimals) + 'K';
+                }
+                return num.toFixed(decimals);
+            }
+            
+            formatDate(date) {
+                return date.toLocaleString();
+            }
+        }
+
+        // Klasa do zarządzania efektami terminala
+        class TerminalEffects {
+            constructor() {
+                this.glitchElement = document.querySelector('.glitch');
+                this.flickerElement = document.querySelector('.flicker');
+                
+                // Inicjalizuj losowe efekty
+                this.initRandomEffects();
+            }
+            
+            initRandomEffects() {
+                // Losowe glitche
+                setInterval(() => {
+                    if (Math.random() < 0.1) {
+                        this.triggerGlitch();
+                    }
+                }, 5000);
+                
+                // Losowe migotanie
+                setInterval(() => {
+                    if (Math.random() < 0.2) {
+                        this.triggerFlicker();
+                    }
+                }, 8000);
+            }
+            
+            triggerGlitch() {
+                this.glitchElement.style.opacity = '0.2';
+                setTimeout(() => {
+                    this.glitchElement.style.opacity = '0';
+                }, 200);
+            }
+            
+            triggerFlicker() {
+                this.flickerElement.style.opacity = '0.3';
+                setTimeout(() => {
+                    this.flickerElement.style.opacity = '0';
+                }, 150);
+            }
+        }
+
+        // ASCII art logo Bitcoina
+        const bitcoinLogo = `
+        ░░░░░░░░░░░░░░░░░░░░▓████████▓░░░░░░░░░░░░░░░░░░
+        ░░░░░░░░░░░░░░░▓█████▓▒░░░░░▒█████▓░░░░░░░░░░░░░
+        ░░░░░░░░░░░░▓████▒░░░░░░░░░░░░░░▒████▓░░░░░░░░░░
+        ░░░░░░░░░░████▒░░░░░░░░░░░░░░░░░░░░▒████░░░░░░░░
+        ░░░░░░░░▓███░░░░░░░░░░░░░░░░░░░░░░░░░░███▓░░░░░░
+        ░░░░░░░███░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░███░░░░░
+        ░░░░░░███░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░███░░░░
+        ░░░░░███░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░███░░░
+        ░░░░███░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░███░░
+        ░░░███░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░███░
+        ░░███░░░░░████▓░░░░░░░░░░░░░░░░░████▓░░░░░░░███░
+        ░███░░░░░█████████▓░░░░░░░░░░▓█████████░░░░░░███
+        ░███░░░▓██▓░░░░░▓████▓░░░░▓████▓░░░░░▓██▓░░░███░
+        ███░░░███░░░░░░░░░███████████░░░░░░░░░███░░░░███
+        ███░░███░░░░░░░░░░░░█████▓░░░░░░░░░░░░░███░░░██▓
+        ██░░███░░░░░░░░░░░░░░███░░░░░░░░░░░░░░░░███░░██▒
+        ██░███░░░░░░░░░░░░░░███▒░░░░░░░░░░░░░░░░░███░██▒
+        ██░███░░░░░░░░░░░░░███▒░░░░░░░░░░░░░░░░░░███░██░
+        █░███░░░░░░░░░░░░░███░░░░░░░░░░░░░░░░░░░░███░░█▒
+        █░██▓░░░░░░░░░░░░███░░░░░░░░░░░░░░░░░░░░░▓██░░█░
+        █░██░░░░░░░░░░░░███░░░░░░░░░░░░░░░░░░░░░░░██░░█░
+        █░██░░░░░░░░░░░███░░░░░░░░░░░░░░░░░░░░░░░░██░░█░
+        ░███░░░░░░░░░░███░░░░░░░░░░░░░░░░░░░░░░░░░██░░█░
+        ░███░░░░░░░░░███░░░░░░░░░░░░░░░░░░░░░░░░░███░░█░
+        ░▓██░░░░░░░░███░░░░░░░░░░░░░░░░░░░░░░░░░░██░░░█░
+        ░░██░░░░░░░███░░░░░░░░░░░░░░░░░░░░░░░░░░███░░░█░
+        ░░██▒░░░░░███░░░░░░░░░░░░░░░░░░░░░░░░░░░██░░░░█░
+        ░░░██░░░░███░░░░░░░░░░░░░░░░░░░░░░░░░░░██▒░░░░█░
+        ░░░███░░██▓░░░░░░░░░░░░░░░░░░░░░░░░░░░██░░░░░░█░
+        ░░░░██░░██░░░░░░░░░░░░░░░░░░░░░░░░░░░██░░░░░░█▓░
+        ░░░░▓██░███░░░░░░░░░░░░░░░░░░░░░░░░███░░░░░░█▓░░
+        ░░░░░███▓███░░░░░░░░░░░░░░░░░░░░░███░░░░░░░█▓░░░
+        ░░░░░░███░███░░░░░░░░░░░░░░░░░░███▒░░░░░░░█▓░░░░
+        ░░░░░░░██▓░████▓░░░░░░░░░░░▓████░░░░░░░░██░░░░░░
+        ░░░░░░░░███░█████████████████▓░░░░░░░░██▒░░░░░░░
+        ░░░░░░░░░███░░▓█████████▓▒░░░░░░░░░░██▓░░░░░░░░░
+        ░░░░░░░░░░████░░░░░░░░░░░░░░░░░░░████░░░░░░░░░░░
+        ░░░░░░░░░░░▒████▓░░░░░░░░░░░░▓████▒░░░░░░░░░░░░░
+        ░░░░░░░░░░░░░░▓█████▓▒░░▒▓█████▓░░░░░░░░░░░░░░░░
+        ░░░░░░░░░░░░░░░░░░▓███████▓░░░░░░░░░░░░░░░░░░░░░`;
+
+        // Inicjalizacja po załadowaniu dokumentu
         document.addEventListener('DOMContentLoaded', () => {
-            bitcoinHeader.init();
+            // Inicjalizuj terminal i usługi
+            const terminal = new TerminalTyper('#terminal-output', { speed: 20, delay: 800 });
+            const bitcoinData = new BitcoinDataService();
+            const effects = new TerminalEffects();
+            
+            // Funkcja do generowania zawartości terminala
+            function initTerminal() {
+                // Wyświetl logo ASCII i początkowe informacje
+                terminal.addToQueue("clear", true);
+                terminal.addToQueue(`<pre class="bitcoin-logo">${bitcoinLogo}</pre>`);
+                terminal.addToQueue("connect --network bitcoin-mainnet", true);
+                terminal.addToQueue("<span class='loading'>Nawiązywanie połączenia z siecią Bitcoin</span>");
+                terminal.addToQueue("Połączono z MainNet. Synchronizacja: 100%");
+                terminal.addToQueue("auth --user satoshi --hash 4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b", true);
+                terminal.addToQueue("Dostęp przyznany. Witaj, Satoshi!");
+                terminal.addToQueue("status --full", true);
+                
+                // Wyświetl dane o Bitcoin
+                displayBitcoinData();
+                
+                // Nasłuchuj na aktualizacje danych
+                document.addEventListener('bitcoinDataUpdated', () => {
+                    terminal.addToQueue("refresh --data live", true);
+                    terminal.addToQueue("<span class='loading'>Aktualizacja danych Bitcoin w czasie rzeczywistym</span>");
+                    displayBitcoinData();
+                });
+                
+                // Okresowo wyświetlaj różne komendy
+                scheduleRandomCommands();
+            }
+            
+            // Funkcja wyświetlająca dane o Bitcoin
+            function displayBitcoinData() {
+                const data = bitcoinData.getData();
+                const priceChangeClass = data.priceChange24h >= 0 ? 'positive' : 'error';
+                
+                const dataHTML = `
+                <div class="data-grid">
+                    <div class="data-item">
+                        <div class="data-label">Kurs BTC/USD</div>
+                        <div class="data-value">$${data.price.toFixed(2)}</div>
+                        <small class="${priceChangeClass}">${data.priceChange24h >= 0 ? '▲' : '▼'} ${Math.abs(data.priceChange24h).toFixed(2)}%</small>
+                    </div>
+                    <div class="data-item">
+                        <div class="data-label">Kapitalizacja rynkowa</div>
+                        <div class="data-value">$${bitcoinData.formatNumber(data.marketCap)}</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="data-label">Wolumen 24h</div>
+                        <div class="data-value">$${bitcoinData.formatNumber(data.volume24h)}</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="data-label">Wysokość bloku</div>
+                        <div class="data-value">${data.blockHeight}</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="data-label">Hash bloku</div>
+                        <div class="data-value" style="font-size: 0.65rem; word-break: break-all;">${data.lastBlockHash}</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="data-label">Trudność</div>
+                        <div class="data-value">${bitcoinData.formatNumber(data.difficulty, 0)}</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="data-label">Niepotwierdzonych transakcji</div>
+                        <div class="data-value">${data.unconfirmedTx}</div>
+                    </div>
+                    <div class="data-item">
+                        <div class="data-label">Ostatnia aktualizacja</div>
+                        <div class="data-value" style="font-size: 0.75rem;">${bitcoinData.formatDate(data.lastUpdate)}</div>
+                    </div>
+                </div>`;
+                
+                terminal.addToQueue(dataHTML);
+            }
+            
+            // Funkcja planująca losowe komendy w terminalu
+            function scheduleRandomCommands() {
+                const commands = [
+                    { cmd: "trace --tx 3a1bde7d0405dec5d054fbc19fbfa1faf4a3c374c5937a817f5f693c50f274ac", response: "Transakcja potwierdzona w bloku #837490. Opłata: 0.00045 BTC" },
+                    { cmd: "analyze --mempool", response: "Analiza mempool: 3267 transakcji oczekujących. Średnia opłata: 21 sat/vbyte" },
+                    { cmd: "check --hashrate", response: "Szacowany hashrate sieci: 480.52 EH/s. Wzrost 5.2% w ostatnich 7 dniach." },
+                    { cmd: "forecast --price", response: "Analiza predykcyjna ceny BTC: Niepewność modelu zbyt wysoka dla dokładnej prognozy." },
+                ];
+                
+                let delay = 15000;
+                
+                commands.forEach(commandObj => {
+                    setTimeout(() => {
+                        terminal.addToQueue(commandObj.cmd, true);
+                        terminal.addToQueue(commandObj.response);
+                    }, delay);
+                    delay += 20000 + Math.random() * 10000;
+                });
+                
+                // Efekt glitch
+                setTimeout(() => {
+                    effects.triggerGlitch();
+                    terminal.addToQueue("WARNING: Anomaly detected in network traffic pattern", false, "error");
+                    terminal.addToQueue("scan --security", true);
+                    terminal.addToQueue("Security scan complete. No threats detected. False positive identified.");
+                }, 30000);
+            }
+            
+            // Rozpocznij wyświetlanie
+            initTerminal();
         });
     </script>
 </body>
