@@ -4,19 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bitcoin Dashboard Neo</title>
-    
+
     <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700&family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
-    
+
     <!-- Three.js for 3D effects -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    
+
     <!-- Chart.js for beautiful charts -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    
-    <!-- GSAP for smooth animations -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.9.1/gsap.min.js"></script>
-    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <!-- Chart.js Annotation Plugin (Optional, for annotations - though not used in this final version) -->
+    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-annotation/1.4.0/chartjs-plugin-annotation.min.js"></script> -->
+
+    <!-- GSAP for smooth animations (Used ONLY for the toggle switch animations) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
     <style>
         :root {
             --neon-blue: #00f3ff;
@@ -27,13 +30,13 @@
             --panel-border: rgba(32, 129, 195, 0.5);
             --text-color: #e0e0ff;
         }
-        
+
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
             font-family: 'Roboto', sans-serif;
             background-color: var(--background);
@@ -43,9 +46,9 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
+            /* Removed justify-content: center from original to allow scrolling */
         }
-        
+
         #canvas-container {
             position: fixed;
             top: 0;
@@ -54,32 +57,56 @@
             height: 100%;
             z-index: -1;
         }
-        
+
+        /* Original Dashboard Layout */
         .dashboard-container {
             width: 100%;
             max-width: 1800px;
             padding: 20px;
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); /* Original */
             grid-gap: 20px;
-            margin-top: 80px;
+            margin-top: 80px; /* Original */
             margin-bottom: 80px;
             z-index: 1;
         }
-        
+
+        /* Original Panel Styles */
         .panel {
             background: var(--panel-bg);
             border: 1px solid var(--panel-border);
             border-radius: 10px;
-            padding: 15px;
+            padding: 15px; /* Original */
             box-shadow: 0 0 15px rgba(0, 243, 255, 0.2);
             backdrop-filter: blur(5px);
-            transition: transform 0.3s, box-shadow 0.3s;
+            transition: box-shadow 0.3s; /* Original - only transition box-shadow */
             position: relative;
-            overflow: hidden;
-            min-height: 200px;
+            overflow: hidden; /* Original - keep hidden unless tilt needs visible */
+            min-height: 200px; /* Original */
+             /* Original tilt effect needs preserve-3d */
+            transform-style: preserve-3d;
+             /* Use flex for internal layout if needed by content, original didn't explicitly set it here */
+             display: flex;
+             flex-direction: column;
         }
-        
+
+        /* Original Panel Shine (Handled by JS) */
+        .panel-shine {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border-radius: 10px;
+            /* Background set by JS */
+            pointer-events: none;
+            z-index: 1;
+            opacity: 0; /* Start hidden, controlled by JS */
+            transition: opacity 0.4s ease-out; /* Add transition for fade out */
+        }
+
+
+        /* Original Panel Border Animation */
         .panel::before {
             content: '';
             position: absolute;
@@ -94,318 +121,618 @@
             background-size: 400% 400%;
             animation: gradientBorder 15s ease infinite;
         }
-        
+
         @keyframes gradientBorder {
             0% { background-position: 0% 50% }
             50% { background-position: 100% 50% }
             100% { background-position: 0% 50% }
         }
-        
-        .panel:hover {
-            transform: translateY(-5px) scale(1.02);
-            box-shadow: 0 5px 20px rgba(0, 243, 255, 0.4);
-        }
-        
+
+        /* Original Panel Hover (Handled by JS Tilt) */
+        /* .panel:hover { ... } - Removed as JS handles transform */
+
+        /* Original Panel Header */
         .panel-header {
             font-family: 'Orbitron', sans-serif;
             display: flex;
             justify-content: space-between;
-            align-items: center;
+            align-items: flex-start; /* Changed from center to align title top */
             margin-bottom: 15px;
             padding-bottom: 10px;
             border-bottom: 1px solid rgba(0, 243, 255, 0.3);
+            flex-shrink: 0; /* Prevent header shrinking */
+            gap: 10px; /* Add gap between title and controls */
         }
-        
+
+        /* NEW Container for controls */
+        .panel-controls {
+            display: flex;
+            /* flex-direction: column; */ /* Removed - now side-by-side */
+            /* align-items: flex-end; */   /* Removed */
+            align-items: center; /* Align items vertically */
+            flex-wrap: wrap; /* Allow wrapping if space is tight */
+            gap: 10px; /* Space between time filter and source toggle */
+            justify-content: flex-end; /* Align to the right */
+        }
+
+        /* Original Panel Title */
         .panel-title {
-            font-size: 1.2rem;
+            font-size: 1.2rem; /* Original */
             font-weight: 600;
             color: var(--neon-blue);
             text-transform: uppercase;
             letter-spacing: 1px;
         }
-        
+
+        /* Original Panel Content Layout */
         .panel-content {
-            height: calc(100% - 40px);
+            /* Original didn't set explicit height, relied on parent min-height */
+            flex-grow: 1; /* Allow content to fill space */
             display: flex;
             flex-direction: column;
-            justify-content: center;
+            /* Original didn't set justify-content here */
+            position: relative;
+             z-index: 2;
         }
-        
+
+         /* Specific content scrolling */
+         .panel-content#latest-transactions,
+         .panel-content#bitcoin-news {
+              overflow-y: auto;
+              max-height: 280px; /* Adjust as needed, original didn't specify */
+               /* Custom scrollbar (optional) */
+              scrollbar-width: thin;
+              scrollbar-color: var(--neon-blue) rgba(0, 0, 0, 0.3);
+         }
+         .panel-content#latest-transactions::-webkit-scrollbar,
+         .panel-content#bitcoin-news::-webkit-scrollbar {
+             width: 6px;
+         }
+         .panel-content#latest-transactions::-webkit-scrollbar-track,
+         .panel-content#bitcoin-news::-webkit-scrollbar-track {
+             background: rgba(0, 0, 0, 0.3);
+             border-radius: 3px;
+         }
+         .panel-content#latest-transactions::-webkit-scrollbar-thumb,
+         .panel-content#bitcoin-news::-webkit-scrollbar-thumb {
+             background-color: var(--neon-blue);
+             border-radius: 3px;
+         }
+
+
+        /* Original Price Styles */
         .price-value {
             font-family: 'Orbitron', sans-serif;
-            font-size: 2.5rem;
+            font-size: 2.5rem; /* Original */
             font-weight: 700;
-            margin-bottom: 10px;
+            margin-bottom: 10px; /* Original */
+            text-align: center; /* Added for centering */
             text-shadow: 0 0 10px rgba(0, 243, 255, 0.7);
             color: #ffffff;
             background: linear-gradient(to right, var(--neon-blue), var(--neon-pink));
             -webkit-background-clip: text;
+            background-clip: text; /* Standard property */
             -webkit-text-fill-color: transparent;
         }
-        
+
         .price-change {
-            font-size: 1.1rem;
+            font-size: 1.1rem; /* Original */
             font-weight: 500;
+            text-align: center; /* Added for centering */
         }
-        
+
         .price-change.positive {
             color: var(--neon-green);
         }
-        
+
         .price-change.negative {
             color: #ff5252;
         }
-        
+
+        /* Original Chart Container */
         .chart-container {
             width: 100%;
-            height: 200px;
+            height: 200px; /* Original */
+            margin-top: 15px; /* Added margin */
         }
-        
+
+        /* Original Data Grid */
         .data-grid {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            grid-gap: 10px;
+            grid-template-columns: repeat(2, 1fr); /* Original */
+            grid-gap: 10px; /* Original */
+            margin-bottom: 15px; /* Added margin */
         }
-        
+
+        /* Original Data Item */
         .data-item {
             display: flex;
             flex-direction: column;
         }
-        
+
+        /* Original Data Label */
         .data-label {
-            font-size: 0.9rem;
+            font-size: 0.9rem; /* Original */
             color: rgba(224, 224, 255, 0.7);
-            margin-bottom: 5px;
+            margin-bottom: 5px; /* Original */
+            text-transform: uppercase; /* Added */
         }
-        
+
+        /* Original Data Value */
         .data-value {
             font-family: 'Orbitron', sans-serif;
-            font-size: 1.3rem;
+            font-size: 1.3rem; /* Original */
             font-weight: 600;
             color: var(--neon-blue);
         }
-        
+        /* Original didn't have data-sublabel */
+
+        /* Original Time Filter */
         .time-filter {
             display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
+            justify-content: center; /* Added */
+            gap: 10px; /* Original */
+            margin-bottom: 15px; /* Original */
             flex-wrap: wrap;
         }
-        
+
+        /* Original Time Filter Button */
         .time-filter button {
             background: rgba(0, 243, 255, 0.1);
-            border: 1px solid var(--neon-blue);
+            border: 1px solid var(--neon-blue); /* Original */
             color: var(--text-color);
-            padding: 5px 12px;
+            padding: 4px 10px; /* Slightly smaller padding */
             border-radius: 20px;
-            font-size: 0.9rem;
+            font-size: 0.8rem; /* Slightly smaller font */
             cursor: pointer;
             transition: all 0.3s ease;
         }
-        
+
         .time-filter button:hover, .time-filter button.active {
             background: var(--neon-blue);
             color: #000;
         }
-        
+
+        /* Original Update Time */
         .update-time {
-            font-size: 0.7rem;
+            font-size: 0.7rem; /* Original */
             color: rgba(224, 224, 255, 0.5);
             text-align: right;
-            margin-top: 10px;
+            margin-top: auto; /* Push to bottom */
+            padding-top: 10px;
             font-style: italic;
+            flex-shrink: 0;
         }
-        
-        /* Search section */
+
+        /* Search section (Using NEW layout with integrated toggle) */
         .search-container {
             position: relative;
             width: 100%;
-            max-width: 600px;
-            margin: 50px auto;
+            max-width: 700px;
+            margin: 30px auto;
             z-index: 10;
-        }
-        
-        .search-toggle {
-            position: absolute;
-            right: 10px;
-            top: 0;
-            bottom: 0;
             display: flex;
             align-items: center;
-            z-index: 2;
+            gap: 15px;
+            padding: 0 20px;
         }
-        
-        .toggle-switch {
-            position: relative;
-            width: 140px;
-            height: 40px;
-            background: rgba(10, 15, 30, 0.9);
-            border: 1px solid var(--panel-border);
-            border-radius: 30px;
-            display: flex;
-            align-items: center;
-            cursor: pointer;
-            overflow: hidden;
-            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.6), 0 0 10px rgba(0, 243, 255, 0.5);
+
+        #search-form {
+             display: flex;
+             align-items: center;
+             flex-grow: 1;
+             position: relative;
+        }
+
+        .search-input {
+            flex-grow: 1;
+            height: 50px;
+            background: rgba(10, 15, 25, 0.8);
+            border: 2px solid rgba(0, 153, 255, 0.3);
+            border-radius: 25px;
+            padding: 0 55px 0 20px;
+            color: var(--text-color);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.1rem;
+            letter-spacing: 1px;
+            outline: none;
+            box-shadow: 0 0 15px rgba(0, 153, 255, 0.1), inset 0 0 10px rgba(0, 0, 0, 0.5);
             transition: all 0.3s ease;
         }
-        
-        .toggle-option {
-            width: 50%;
-            height: 100%;
+
+        .search-input:focus {
+            border-color: rgba(0, 153, 255, 0.8);
+            box-shadow: 0 0 20px rgba(0, 153, 255, 0.3), inset 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+
+        .search-button {
+            position: absolute;
+            right: 6px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #081018 10%, #0e1c30 90%);
+            border: 1px solid rgba(0, 153, 255, 0.3);
+            cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-family: 'Orbitron', sans-serif;
-            font-size: 0.9rem;
-            z-index: 2;
-            transition: color 0.3s ease, text-shadow 0.3s ease;
-            user-select: none;
+            overflow: hidden;
+            transition: all 0.3s ease;
         }
-        
-        .toggle-switch[data-search="google"] .toggle-option:first-child,
-        .toggle-switch[data-search="perplexity"] .toggle-option:last-child {
-            color: #000;
-            text-shadow: 0 0 5px rgba(255, 255, 255, 0.7);
-        }
-        
-        .toggle-switch[data-search="google"] .toggle-option:last-child,
-        .toggle-switch[data-search="perplexity"] .toggle-option:first-child {
-            color: rgba(224, 224, 255, 0.7);
-            text-shadow: 0 0 5px rgba(0, 243, 255, 0.3);
-        }
-        
-        .toggle-slide {
-            position: absolute;
-            width: 50%;
-            height: 80%;
-            top: 10%;
-            left: 5%;
-            background: linear-gradient(45deg, var(--neon-blue), var(--neon-pink));
-            border-radius: 20px;
-            transition: transform 0.4s cubic-bezier(0.85, 0.05, 0.18, 1.35);
-            z-index: 1;
-            box-shadow: 0 0 10px rgba(0, 243, 255, 0.7), inset 0 0 5px rgba(255, 255, 255, 0.5);
-        }
-        
-        .toggle-switch[data-search="perplexity"] .toggle-slide {
-            transform: translateX(90%);
-        }
-        
-        /* Dodatkowe elementy dla mechanicznego efektu */
-        .toggle-switch::before {
+
+         .search-button::before {
             content: '';
             position: absolute;
-            left: 50%;
             top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(rgba(0, 153, 255, 0.2), transparent);
+            opacity: 0.3;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .search-button:hover::before {
+            opacity: 0.6;
+        }
+
+        .search-button::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -150%;
+            width: 120%;
+            height: 100%;
+            background: linear-gradient(to right, transparent, rgba(0, 153, 255, 0.4), transparent);
+            transform: skewX(-20deg);
+            transition: all 0.5s ease;
+        }
+
+        .search-button:hover::after {
+            left: 150%;
+        }
+
+        .search-icon {
+            width: 18px;
+            height: 18px;
+            fill: rgba(224, 224, 255, 0.8);
+            transition: all 0.3s ease;
+        }
+
+        .search-toggle {
+            display: flex;
+            align-items: center;
+            z-index: 2;
+            flex-shrink: 0;
+        }
+
+        /* --- NEW Toggle Switch Styles START --- */
+        .toggle-container {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            perspective: 500px;
+            z-index: 5;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 220px;
+            height: 50px;
+            background: linear-gradient(0deg, #0a0e17 10%, #131c2e 90%);
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0;
+            box-shadow: 0 0 15px rgba(0, 153, 255, 0.3),
+                        inset 0 0 15px rgba(0, 0, 0, 0.8),
+                        inset 0 0 2px rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+            overflow: hidden;
+            cursor: pointer;
+            border: 1px solid rgba(0, 144, 255, 0.3);
+        }
+
+        .toggle-switch::before { /* Grid background */
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
             bottom: 0;
-            width: 1px;
-            background: rgba(0, 243, 255, 0.3);
+            background:
+                linear-gradient(90deg, transparent 49.5%, rgba(0, 153, 255, 0.15) 50%, transparent 50.5%) 0 0 / 15px 100%,
+                linear-gradient(0deg, transparent 49.5%, rgba(0, 153, 255, 0.15) 50%, transparent 50.5%) 0 0 / 100% 8px;
+            pointer-events: none;
+            opacity: 0.5;
             z-index: 0;
         }
-        
-        .toggle-switch::after {
+
+        .toggle-switch[data-search="google"] .toggle-mechanism {
+            transform: translateX(0);
+        }
+
+        .toggle-switch[data-search="perplexity"] .toggle-mechanism {
+            transform: translateX(110px);
+        }
+
+        .toggle-mechanism {
+            position: absolute;
+            width: 110px;
+            height: 44px;
+            background: linear-gradient(135deg, #081018 10%, #0e1c30 90%);
+            border-radius: 5px;
+            top: 3px;
+            left: 3px;
+            z-index: 1;
+            transition: transform 0.5s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.7), inset 0 0 2px rgba(0, 153, 255, 0.5);
+            border: 1px solid rgba(0, 153, 255, 0.3);
+            overflow: hidden;
+        }
+
+        .toggle-mechanism::before { /* Inner grid for mechanism */
             content: '';
             position: absolute;
-            top: -1px;
-            left: -1px;
-            right: -1px;
-            bottom: -1px;
-            border-radius: 30px;
-            background: linear-gradient(45deg, var(--neon-blue), var(--neon-pink), var(--neon-green));
-            opacity: 0.5;
-            z-index: -1;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background:
+                linear-gradient(90deg, transparent 48%, rgba(0, 153, 255, 0.3) 50%, transparent 52%) 0 0 / 6px 100%,
+                linear-gradient(0deg, transparent 48%, rgba(0, 153, 255, 0.3) 50%, transparent 52%) 0 0 / 100% 3px;
+            opacity: 0.1;
+        }
+
+        .toggle-mechanism::after { /* Inner shadow/highlight */
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 90px;
+            height: 25px;
+            background: linear-gradient(0deg, rgba(0, 0, 0, 0.7) 0%, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 0) 60%, rgba(0, 0, 0, 0.7) 100%);
+            border-radius: 3px;
+            box-shadow: inset 0 0 4px rgba(0, 153, 255, 0.5);
+            opacity: 0.8;
+        }
+
+        .toggle-labels {
+            position: absolute;
+            display: flex;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
             pointer-events: none;
         }
-        
-        .toggle-knob {
+
+        .toggle-label {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: rgba(255, 255, 255, 0.6);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.8rem;
+            letter-spacing: 1px;
+            text-shadow: 0 0 5px rgba(0, 153, 255, 0.5);
+            transition: all 0.3s ease;
+            opacity: 0.8;
+        }
+
+        .toggle-switch[data-search="google"] .toggle-label-google {
+            color: #4285F4;
+            text-shadow: 0 0 10px rgba(66, 133, 244, 0.7);
+            font-weight: 600;
+            opacity: 1;
+        }
+
+        .toggle-switch[data-search="perplexity"] .toggle-label-perplexity {
+            color: #02C4CC;
+            text-shadow: 0 0 10px rgba(2, 196, 204, 0.7);
+            font-weight: 600;
+            opacity: 1;
+        }
+
+        .toggle-led-container {
+            position: absolute;
+            top: -4px;
+            left: 0;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 5px;
+            z-index: 3;
+            pointer-events: none;
+        }
+
+        .toggle-led {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background-color: rgba(0, 0, 0, 0.5);
+            box-shadow: 0 0 4px currentColor, 0 0 8px currentColor;
+            transition: all 0.5s ease;
+            opacity: 0.7;
+        }
+
+        .led-google {
+            color: rgba(66, 133, 244, 0.3);
+        }
+
+        .led-perplexity {
+            color: rgba(2, 196, 204, 0.3);
+        }
+
+        .toggle-switch[data-search="google"] .led-google {
+            color: #4285F4;
+            animation: pulse 2s infinite;
+        }
+
+        .toggle-switch[data-search="perplexity"] .led-perplexity {
+            color: #02C4CC;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 4px currentColor, 0 0 8px currentColor; opacity: 0.7; }
+            50% { box-shadow: 0 0 8px currentColor, 0 0 12px currentColor, 0 0 16px currentColor; opacity: 1; }
+            100% { box-shadow: 0 0 4px currentColor, 0 0 8px currentColor; opacity: 0.7; }
+        }
+
+        .bolt {
             position: absolute;
             width: 8px;
             height: 8px;
             border-radius: 50%;
-            background: rgba(255, 255, 255, 0.8);
-            top: 50%;
-            transform: translateY(-50%);
-            z-index: 2;
-            box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+            background: linear-gradient(135deg, #303540, #1a1f2a);
+            border: 1px solid rgba(0, 153, 255, 0.4);
+            box-shadow: inset 0 0 1px rgba(255, 255, 255, 0.3);
+            z-index: 5;
         }
-        
-        .toggle-knob-left {
-            left: 5px;
-        }
-        
-        .toggle-knob-right {
-            right: 5px;
-        }
-        
-        .toggle-switch[data-search="google"] .toggle-knob-left {
-            background: var(--neon-blue);
-            box-shadow: 0 0 10px var(--neon-blue);
-        }
-        
-        .toggle-switch[data-search="perplexity"] .toggle-knob-right {
-            background: var(--neon-pink);
-            box-shadow: 0 0 10px var(--neon-pink);
-        }
-        
-        .search-input {
-            width: 100%;
-            height: 60px;
-            background: rgba(16, 23, 41, 0.8);
-            border: 2px solid var(--panel-border);
-            border-radius: 30px;
-            padding: 0 60px 0 20px;
-            color: var(--text-color);
-            font-family: 'Orbitron', sans-serif;
-            font-size: 1.2rem;
-            outline: none;
-            transition: all 0.3s ease;
-        }
-        
-        .search-input:focus {
-            box-shadow: 0 0 15px rgba(0, 243, 255, 0.5);
-            border-color: var(--neon-blue);
-        }
-        
-        .search-button {
+
+        .bolt::before {
+            content: '';
             position: absolute;
-            right: 10px;
-            top: 10px;
-            width: 40px;
-            height: 40px;
-            background: linear-gradient(45deg, var(--neon-blue), var(--neon-pink));
-            border: none;
-            border-radius: 50%;
-            cursor: pointer;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 3px;
+            height: 1px;
+            background: rgba(0, 153, 255, 0.7);
+        }
+
+        .bolt::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(90deg);
+            width: 3px;
+            height: 1px;
+            background: rgba(0, 153, 255, 0.7);
+        }
+
+        .bolt-1 { top: 3px; left: 3px; }
+        .bolt-2 { top: 3px; right: 3px; }
+        .bolt-3 { bottom: 3px; left: 3px; }
+        .bolt-4 { bottom: 3px; right: 3px; }
+
+        .model-signature {
+            position: absolute;
+            bottom: -18px;
+            left: 0;
+            width: 100%;
             display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.3s ease;
+            justify-content: space-between;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.5rem;
+            color: rgba(0, 153, 255, 0.6);
+            padding: 0 5px;
         }
-        
-        .search-button:hover {
-            transform: scale(1.1);
+
+        /* Toggle Animations */
+        .switching {
+            animation: switch-wiggle 0.5s ease-in-out;
+            pointer-events: none !important;
         }
-        
-        .search-icon {
-            fill: var(--text-color);
-            width: 20px;
-            height: 20px;
+
+        @keyframes switch-wiggle {
+            0% { transform: rotate(0deg); }
+            10% { transform: rotate(-1.5deg) scale(0.98); }
+            20% { transform: rotate(1.5deg) scale(0.99); }
+            30% { transform: rotate(-2deg) scale(0.97); }
+            40% { transform: rotate(2deg) scale(0.99); }
+            50% { transform: rotate(-1.5deg) scale(0.98); }
+            60% { transform: rotate(1.5deg) scale(0.99); }
+            70% { transform: rotate(-1deg) scale(0.99); }
+            80% { transform: rotate(1deg) scale(0.995); }
+            90% { transform: rotate(-0.5deg) scale(1); }
+            100% { transform: rotate(0deg) scale(1); }
         }
-        
-        /* Responsive design */
+
+        .toggle-switch.switching .bolt {
+            animation: bolt-shake 0.5s ease;
+        }
+
+        @keyframes bolt-shake {
+            0% { transform: rotate(0deg); }
+            20% { transform: rotate(-20deg); }
+            40% { transform: rotate(15deg); }
+            60% { transform: rotate(-10deg); }
+            80% { transform: rotate(5deg); }
+            100% { transform: rotate(0deg); }
+        }
+
+        @keyframes switch-flash {
+            0% { opacity: 0; }
+            50% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+
+        .switch-flash {
+            animation: switch-flash 0.3s ease;
+        }
+         .toggle-switch:hover {
+            box-shadow: 0 0 25px rgba(0, 153, 255, 0.5),
+                        inset 0 0 15px rgba(0, 0, 0, 0.8),
+                        inset 0 0 2px rgba(255, 255, 255, 0.2);
+        }
+        /* --- NEW Toggle Switch Styles END --- */
+
+        /* Responsive design (Using Original Breakpoints/Styles where applicable) */
         @media (max-width: 768px) {
             .dashboard-container {
-                grid-template-columns: 1fr;
+                grid-template-columns: 1fr; /* Original */
+                margin-top: 20px; /* Adjust for mobile */
+                padding: 10px;
             }
-            
+
+            /* Original Price Style Adjustment */
             .price-value {
-                font-size: 2rem;
+                font-size: 2rem; /* Original */
             }
-            
+
+            /* NEW Search Container Adjustment */
             .search-container {
-                max-width: 90%;
+                 flex-direction: column;
+                 max-width: 95%;
+                 margin: 20px auto;
+                 gap: 10px;
             }
+             #search-form {
+                 width: 100%;
+             }
+            /* NEW Toggle adjustments */
+            .toggle-switch {
+                width: 180px;
+                height: 45px;
+            }
+             .toggle-mechanism {
+                 width: 90px;
+                 height: 39px;
+                 left: 3px;
+             }
+            .toggle-switch[data-search="perplexity"] .toggle-mechanism {
+                 transform: translateX(84px);
+             }
+             .toggle-label {
+                 font-size: 0.7rem;
+             }
+             /* General panel adjustments */
+              .panel {
+                 padding: 15px;
+              }
+              .panel-title {
+                  font-size: 1rem;
+              }
+               /* Original didn't have specific data grid adjustments here */
         }
 
         /* Loading animation */
@@ -416,6 +743,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            min-height: 100px;
         }
 
         .loading::after {
@@ -431,48 +759,92 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
-        
-        /* Footer */
+
+        /* Original Footer Style */
         footer {
             margin-top: auto;
             width: 100%;
-            padding: 20px;
+            padding: 20px; /* Original */
             text-align: center;
             font-size: 0.8rem;
             color: rgba(224, 224, 255, 0.5);
             background: linear-gradient(to top, rgba(10, 10, 20, 0.9), transparent);
+            z-index: 5;
         }
-        
-        /* Animacja przełączania */
-        .toggle-switch.switching {
-            animation: switch-wiggle 0.4s ease;
+
+        /* Styles for News and Transactions List */
+        /* These might need adjustment based on original data structure */
+        .news-list, .transactions-list {
+            margin-top: 10px;
         }
-        
-        @keyframes switch-wiggle {
-            0% { transform: rotate(0deg); }
-            20% { transform: rotate(-3deg); }
-            40% { transform: rotate(2deg); }
-            60% { transform: rotate(-1deg); }
-            80% { transform: rotate(1deg); }
-            100% { transform: rotate(0deg); }
+
+        .news-item, .transaction-item {
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(0, 243, 255, 0.1);
         }
-        
-        .toggle-switch.switching .toggle-slide {
-            animation: switch-flash 0.3s ease;
+        .news-item:last-child, .transaction-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
         }
-        
-        @keyframes switch-flash {
-            0% { opacity: 1; }
-            50% { opacity: 0.7; }
-            100% { opacity: 1; }
+        .news-item a {
+            display: inline-block;
+            padding: 4px 10px;
+            background: rgba(0, 243, 255, 0.1);
+            border: 1px solid var(--panel-border);
+            color: var(--text-color);
+            text-decoration: none;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            margin-top: 5px;
+            transition: all 0.3s ease;
+        }
+        .news-item a:hover {
+            background: var(--neon-blue);
+            color: #000;
+            border-color: var(--neon-blue);
+        }
+
+        /* Styles for Data Source Toggle */
+        .data-source-toggle {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            /* margin-left: 15px; */ /* Removed margin, handled by panel-controls gap */
+            flex-shrink: 0; /* Prevent shrinking */
+        }
+        .source-label {
+            font-size: 0.75rem;
+            color: rgba(224, 224, 255, 0.6);
+        }
+        .source-button {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(224, 224, 255, 0.2);
+            color: rgba(224, 224, 255, 0.7);
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 0.7rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .source-button:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(224, 224, 255, 0.4);
+        }
+        .source-button.active {
+            background: var(--neon-blue);
+            color: #000;
+            border-color: var(--neon-blue);
+            box-shadow: 0 0 5px rgba(0, 243, 255, 0.5);
         }
     </style>
 </head>
 <body>
     <!-- Three.js canvas container for 3D background effects -->
     <div id="canvas-container"></div>
-    
-    <!-- Search Section -->
+
+    <!-- Search Section (NEW Layout) -->
     <div class="search-container">
         <form id="search-form">
             <input type="text" class="search-input" id="search-input" placeholder="Search the web...">
@@ -481,49 +853,76 @@
                     <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
                 </svg>
             </button>
-            <div class="search-toggle">
-                <div class="toggle-switch" data-search="google">
-                    <div class="toggle-option">Google</div>
-                    <div class="toggle-option">Perplexity</div>
-                    <div class="toggle-slide"></div>
-                    <div class="toggle-knob toggle-knob-left"></div>
-                    <div class="toggle-knob toggle-knob-right"></div>
-                </div>
-            </div>
         </form>
+         <div class="search-toggle">
+              <!-- NEW Toggle Switch HTML -->
+              <div class="toggle-container">
+                  <div class="toggle-switch" data-search="google">
+                      <div class="toggle-mechanism"></div>
+                      <div class="toggle-labels">
+                          <div class="toggle-label toggle-label-google">GOOGLE</div>
+                          <div class="toggle-label toggle-label-perplexity">PERPLEXITY</div>
+                      </div>
+                      <div class="toggle-led-container">
+                          <div class="toggle-led led-google"></div>
+                          <div class="toggle-led led-perplexity"></div>
+                      </div>
+                      <div class="bolt bolt-1"></div>
+                      <div class="bolt bolt-2"></div>
+                      <div class="bolt bolt-3"></div>
+                      <div class="bolt bolt-4"></div>
+                  </div>
+                  <div class="model-signature">
+                      <span>SEARCH-ENGINE-9000</span>
+                      <span>v2.1</span>
+                  </div>
+              </div>
+               <!-- END NEW Toggle Switch HTML -->
+          </div>
     </div>
-    
+
     <!-- Main Dashboard -->
     <div class="dashboard-container">
-        <!-- Bitcoin Price Panel -->
+        <!-- Bitcoin Price Panel (Original Time Filter Buttons) -->
         <div class="panel">
             <div class="panel-header">
                 <h2 class="panel-title">Bitcoin Price</h2>
+                <!-- NEW Controls Container -->
+                <div class="panel-controls">
+                    <!-- Original Time Filter -->
+                    <div class="time-filter" id="price-time-filter">
+                        <button class="active" data-period="24h">24H</button>
+                        <button data-period="7d">7D</button>
+                        <button data-period="30d">30D</button>
+                        <button data-period="3m">3M</button>
+                        <button data-period="1y">1Y</button>
+                    </div>
+                    <!-- NEW Data Source Toggle -->
+                    <div class="data-source-toggle" id="price-data-source">
+                        <span class="source-label">Source:</span>
+                        <button class="source-button active" data-source="coingecko">CoinGecko</button>
+                        <button class="source-button" data-source="cryptocompare">CryptoCompare</button>
+                    </div>
+                </div>
             </div>
             <div class="panel-content">
                 <div class="price-value" id="btc-price">$00,000.00</div>
                 <div class="price-change" id="btc-change">+0.00%</div>
-                <div class="time-filter" id="price-time-filter">
-                    <button class="active" data-period="24h">24H</button>
-                    <button data-period="7d">7D</button>
-                    <button data-period="30d">30D</button>
-                    <button data-period="3m">3M</button>
-                    <button data-period="1y">1Y</button>
-                </div>
                 <div class="chart-container">
                     <canvas id="price-chart"></canvas>
                 </div>
                 <div class="update-time" id="price-update-time">Last updated: --</div>
             </div>
         </div>
-        
-        <!-- Mempool & Transaction Fees Panel -->
+
+        <!-- Mempool & Transaction Fees Panel (Original Structure) -->
         <div class="panel">
             <div class="panel-header">
                 <h2 class="panel-title">Transaction Fees</h2>
             </div>
             <div class="panel-content">
-                <div class="data-grid">
+                <!-- Original Data Grid -->
+                 <div class="data-grid">
                     <div class="data-item">
                         <div class="data-label">Low Priority (sat/vB)</div>
                         <div class="data-value" id="fee-low">-- sat/vB</div>
@@ -537,19 +936,18 @@
                         <div class="data-value" id="fee-high-usd">$--</div>
                     </div>
                 </div>
-                <div class="chart-container">
-                    <canvas id="mempool-chart"></canvas>
-                </div>
+                <!-- Original did not have a mempool chart canvas here -->
                 <div class="update-time" id="mempool-update-time">Last updated: --</div>
             </div>
         </div>
-        
-        <!-- Network Statistics Panel -->
+
+        <!-- Network Statistics Panel (Original Structure) -->
         <div class="panel">
             <div class="panel-header">
                 <h2 class="panel-title">Network Stats</h2>
             </div>
             <div class="panel-content">
+                 <!-- Original Data Grid -->
                 <div class="data-grid">
                     <div class="data-item">
                         <div class="data-label">Hash Rate</div>
@@ -571,25 +969,26 @@
                 <div class="update-time" id="network-update-time">Last updated: --</div>
             </div>
         </div>
-        
-        <!-- Latest Transactions Panel -->
+
+        <!-- Latest Transactions Panel (Structure kept from newer version for better API compatibility) -->
         <div class="panel">
             <div class="panel-header">
                 <h2 class="panel-title">Latest Transactions</h2>
             </div>
             <div class="panel-content" id="latest-transactions">
                 <div class="loading"></div>
-                <div class="update-time" id="transactions-update-time">Last updated: --</div>
+                 <!-- Update time will be added by JS -->
             </div>
         </div>
-        
-        <!-- Market Data Panel -->
-        <div class="panel">
+
+        <!-- Market Data Panel (Structure kept from newer version but styled like original) -->
+         <div class="panel">
             <div class="panel-header">
                 <h2 class="panel-title">Market Data</h2>
             </div>
             <div class="panel-content">
-                <div class="data-grid">
+                 <!-- Using newer 4-item grid but forcing 2 columns -->
+                 <div class="data-grid" style="grid-template-columns: repeat(2, 1fr);">
                     <div class="data-item">
                         <div class="data-label">Market Cap</div>
                         <div class="data-value" id="market-cap">$--</div>
@@ -610,45 +1009,46 @@
                 <div class="update-time" id="market-update-time">Last updated: --</div>
             </div>
         </div>
-        
-        <!-- Bitcoin News Panel -->
+
+        <!-- Bitcoin News Panel (Structure kept from newer version) -->
         <div class="panel">
             <div class="panel-header">
                 <h2 class="panel-title">Bitcoin News</h2>
             </div>
             <div class="panel-content" id="bitcoin-news">
                 <div class="loading"></div>
-                <div class="update-time" id="news-update-time">Last updated: --</div>
+                 <!-- Update time will be added by JS -->
             </div>
         </div>
     </div>
-    
+
     <footer>
+        <!-- Using original footer text -->
         Bitcoin Dashboard Neo | All data is provided by third-party APIs and may not reflect exact real-time values
     </footer>
-    
+
     <script>
-        // 3D Background Effect with Three.js
+        // Original 3D Background Effect (from BTCsimulator/index.html)
         function initThreeJSBackground() {
             const canvas = document.getElementById('canvas-container');
-            
+
             // Scene setup
             const scene = new THREE.Scene();
-            
+
             // Camera setup
             const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
             camera.position.z = 30;
-            
+
             // Renderer setup
             const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(window.devicePixelRatio);
             canvas.appendChild(renderer.domElement);
-            
+
             // Create particles
             const particleCount = 500;
             const particles = new THREE.Group();
-            
+
             // Create bitcoin-inspired particles
             const geometries = [
                 new THREE.OctahedronGeometry(0.5, 0),
@@ -656,38 +1056,38 @@
                 new THREE.IcosahedronGeometry(0.5, 0),
                 new THREE.DodecahedronGeometry(0.5, 0)
             ];
-            
+
             const materials = [
                 new THREE.MeshPhongMaterial({ color: 0x00f3ff, shininess: 100 }),
                 new THREE.MeshPhongMaterial({ color: 0xff00ff, shininess: 100 }),
                 new THREE.MeshPhongMaterial({ color: 0x00ff9f, shininess: 100 }),
                 new THREE.MeshPhongMaterial({ color: 0xffae00, shininess: 100 })
             ];
-            
+
             for(let i = 0; i < particleCount; i++) {
                 const geoIndex = Math.floor(Math.random() * geometries.length);
                 const matIndex = Math.floor(Math.random() * materials.length);
-                
+
                 const particle = new THREE.Mesh(geometries[geoIndex], materials[matIndex]);
-                
+
                 // Random position within a sphere
                 const theta = Math.random() * Math.PI * 2;
                 const phi = Math.acos(Math.random() * 2 - 1);
                 const radius = 10 + Math.random() * 40;
-                
+
                 particle.position.x = radius * Math.sin(phi) * Math.cos(theta);
                 particle.position.y = radius * Math.sin(phi) * Math.sin(theta);
                 particle.position.z = radius * Math.cos(phi);
-                
+
                 // Random rotation
                 particle.rotation.x = Math.random() * Math.PI;
                 particle.rotation.y = Math.random() * Math.PI;
                 particle.rotation.z = Math.random() * Math.PI;
-                
+
                 // Random scale between 0.3 and 1
                 const scale = 0.3 + Math.random() * 0.7;
                 particle.scale.set(scale, scale, scale);
-                
+
                 // Store original position for animation
                 particle.userData.originalPosition = particle.position.clone();
                 particle.userData.randomRotation = new THREE.Vector3(
@@ -695,889 +1095,964 @@
                     Math.random() * 0.01 - 0.005,
                     Math.random() * 0.01 - 0.005
                 );
-                
+
                 particles.add(particle);
             }
-            
+
             scene.add(particles);
-            
+
             // Add lights
             const ambientLight = new THREE.AmbientLight(0x222222);
             scene.add(ambientLight);
-            
+
             const light1 = new THREE.DirectionalLight(0x00f3ff, 1);
             light1.position.set(1, 1, 1);
             scene.add(light1);
-            
+
             const light2 = new THREE.DirectionalLight(0xff00ff, 1);
             light2.position.set(-1, -1, 1);
             scene.add(light2);
-            
+
             // Mouse interaction
             let mouseX = 0;
             let mouseY = 0;
             let targetMouseX = 0;
             let targetMouseY = 0;
-            
+
             document.addEventListener('mousemove', (event) => {
-                mouseX = (event.clientX - window.innerWidth / 2) * 0.01;
-                mouseY = (event.clientY - window.innerHeight / 2) * 0.01;
+                mouseX = (event.clientX - window.innerWidth / 2) * 0.01; // Original sensitivity
+                mouseY = (event.clientY - window.innerHeight / 2) * 0.01; // Original sensitivity
             });
-            
+
             // Animation
             function animate() {
                 requestAnimationFrame(animate);
-                
+
                 // Smooth mouse targeting
                 targetMouseX += (mouseX - targetMouseX) * 0.05;
                 targetMouseY += (mouseY - targetMouseY) * 0.05;
-                
+
                 // Rotate the entire particle group slightly
-                particles.rotation.x += 0.001;
-                particles.rotation.y += 0.002;
-                
+                particles.rotation.x += 0.001; // Original speed
+                particles.rotation.y += 0.002; // Original speed
+
                 // Rotate camera based on mouse position
                 camera.position.x += (targetMouseX - camera.position.x) * 0.05;
                 camera.position.y += (-targetMouseY - camera.position.y) * 0.05;
                 camera.lookAt(scene.position);
-                
+
                 // Animate each particle
                 particles.children.forEach((particle) => {
                     particle.rotation.x += particle.userData.randomRotation.x;
                     particle.rotation.y += particle.userData.randomRotation.y;
                     particle.rotation.z += particle.userData.randomRotation.z;
-                    
+
                     // Make particles hover/float slightly
-                    const time = Date.now() * 0.001;
+                    const time = Date.now() * 0.001; // Original time multiplier
                     const originalPos = particle.userData.originalPosition;
-                    
-                    particle.position.x = originalPos.x + Math.sin(time * 0.5 + originalPos.x) * 0.3;
-                    particle.position.y = originalPos.y + Math.cos(time * 0.7 + originalPos.y) * 0.3;
-                    particle.position.z = originalPos.z + Math.sin(time * 0.3 + originalPos.z) * 0.3;
+
+                    particle.position.x = originalPos.x + Math.sin(time * 0.5 + originalPos.x) * 0.3; // Original amplitude and frequency
+                    particle.position.y = originalPos.y + Math.cos(time * 0.7 + originalPos.y) * 0.3; // Original amplitude and frequency
+                    particle.position.z = originalPos.z + Math.sin(time * 0.3 + originalPos.z) * 0.3; // Original amplitude and frequency
                 });
-                
+
                 renderer.render(scene, camera);
             }
-            
+
             // Handle window resize
             function onWindowResize() {
                 camera.aspect = window.innerWidth / window.innerHeight;
                 camera.updateProjectionMatrix();
                 renderer.setSize(window.innerWidth, window.innerHeight);
             }
-            
+
             window.addEventListener('resize', onWindowResize, false);
-            
+
             // Start animation
             animate();
         }
-        
-        // Search Functionality
+
+        // Search Functionality (NEW Toggle Switch Logic)
         function initSearchFunctionality() {
-            const searchForm = document.getElementById('search-form');
+           const searchForm = document.getElementById('search-form');
             const searchInput = document.getElementById('search-input');
             const toggleSwitch = document.querySelector('.toggle-switch');
-            let searchEngine = 'google'; // Default search engine
-            
-            // Stwórz elementy audio dla efektów dźwiękowych
+            let searchEngine = 'google';
+
+            // Audio elements for NEW toggle
             const switchSound = document.createElement('audio');
-            // Toggle between Google and Perplexity
+            switchSound.src = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU3LjU2LjEwMQAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAADmgD///////////////////////////////////////////8AAAA8TEFNRTMuOTkuNVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//tQwAABLAFe2UEwACX4uJZpKAByVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/+xDEAAMs0ZcwAwZvIrq4lkkIAHFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV';
+            const powerUpSound = document.createElement('audio');
+            powerUpSound.src = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjIwLjEwMAAAAAAAAAAAAAAA/+M4wAAAAAAAAAAAAAAAAAAAAABYaW5nAAAADwAAAAsAABTqAPX19fX19fX19fX19fX19fX19fX19fX19fX19fX1/f39/f39/f39/f39/f39/f39/f39/f39/f39/f3//////////////////wAAADJMQU1FMy4xMDBhAqUAAAAALcoAADQgJAOsTQAARgAA6hf/8VijPwAAAAAAAAAAAAAA/+QQxAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqr/5EjEQAAAAOEAAAAAqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq/+QAxKAAAADjAAAAAKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq\';';
+            powerUpSound.volume = 0.4;
+            const powerDownSound = document.createElement('audio');
+            powerDownSound.src = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjIwLjEwMAAAAAAAAAAAAAAA/+M4wAAAAAAAAAAAAAAAAAAAAABYaW5nAAAADwAAAAsAABQjAObm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ub29vb29vb29vb29vb29vb29vb29vb29v//////////////////////wAAADJMQU1FMy4xMDBhAqUAAAAALisAADQgJAZUTQAARgAAFCP/1JVa/wAAAAAAAAAAAAAA/+QQxAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqr/5EjEQAAAAOEAAAAAqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq/+QAxKAAAADjAAAAAKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq\';';
+            powerDownSound.volume = 0.4;
+            const clickSound = document.createElement('audio');
+            clickSound.src = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjIwLjEwMAAAAAAAAAAAAAAA/+M4wAAAAAAAAAAAAAAAAAAAAABYaW5nAAAADwAAAAYAAAZWADExMTFBQUFBYWFhYYCAgICgoKCgv7+/v9/f39/+/v7+//////////8AAAATTEFNRTNVC8AAAAAtAgAAECQDbE0AAIAAABZW/9gP2QAAAAAAAAAAAAAAAAAA/+QQxAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq/+QAxQAAAANkAAAAAKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq\';';
+            clickSound.volume = 0.3;
+            document.body.appendChild(switchSound);
+            document.body.appendChild(powerUpSound);
+            document.body.appendChild(powerDownSound);
+            document.body.appendChild(clickSound);
+
+            // NEW Toggle Switch Logic
             toggleSwitch.addEventListener('click', () => {
-                if (toggleSwitch.getAttribute('data-search') === 'google') {
-                    toggleSwitch.setAttribute('data-search', 'perplexity');
-                    searchEngine = 'perplexity';
-                    searchInput.placeholder = "Ask Perplexity...";
-                } else {
-                    toggleSwitch.setAttribute('data-search', 'google');
-                    searchEngine = 'google';
-                    searchInput.placeholder = "Search the web...";
-                }
-                
-                // Add neon flash effect on toggle
-                document.body.style.overflow = 'hidden'; // Prevent scrolling during animation
+                if (toggleSwitch.classList.contains('switching')) return;
+                toggleSwitch.classList.add('switching');
+                clickSound.currentTime = 0; clickSound.play();
+                if (window.navigator.vibrate) window.navigator.vibrate([15, 30, 15]);
+
                 const flashOverlay = document.createElement('div');
-                flashOverlay.style.position = 'fixed';
+                 flashOverlay.style.position = 'fixed';
                 flashOverlay.style.top = '0';
                 flashOverlay.style.left = '0';
                 flashOverlay.style.width = '100%';
                 flashOverlay.style.height = '100%';
-                flashOverlay.style.backgroundColor = 'rgba(0, 243, 255, 0.2)';
+                flashOverlay.style.background = 'radial-gradient(circle at 50% 40%, rgba(0, 243, 255, 0.3) 0%, rgba(0, 0, 0, 0) 60%)';
                 flashOverlay.style.zIndex = '999';
                 flashOverlay.style.pointerEvents = 'none';
+                flashOverlay.style.opacity = '0';
                 document.body.appendChild(flashOverlay);
-                
-                gsap.to(flashOverlay, {
-                    opacity: 0,
-                    duration: 0.5,
-                    onComplete: () => {
-                        document.body.removeChild(flashOverlay);
-                        document.body.style.overflow = '';
+
+                gsap.to(flashOverlay, { opacity: 1, duration: 0.2,
+                    onComplete: () => { gsap.to(flashOverlay, { opacity: 0, duration: 0.5, delay: 0.2, onComplete: () => { if (document.body.contains(flashOverlay)) document.body.removeChild(flashOverlay); } });
                     }
                 });
-                
-                // Apply 3D tilt effect to all panels
+
                 const panels = document.querySelectorAll('.panel');
-                panels.forEach((panel) => {
-                    gsap.to(panel, {
-                        rotationY: 5,
-                        rotationX: -3,
-                        duration: 0.2,
+                panels.forEach((panel, index) => {
+                    setTimeout(() => {
+                        gsap.to(panel, {
+                            rotationY: Math.random() * 6 - 3,
+                            rotationX: Math.random() * 6 - 3,
+                            duration: 0.15,
+                            ease: 'power2.out',
+                            onComplete: () => {
+                                gsap.to(panel, {
+                                    rotationY: 0,
+                                    rotationX: 0,
+                                    duration: 0.4,
+                                    ease: 'elastic.out(1, 0.3)'
+                                });
+                            }
+                        });
+                     }, index * 50);
+                });
+
+                const bolts = toggleSwitch.querySelectorAll('.bolt');
+                bolts.forEach((bolt) => {
+                     gsap.to(bolt, {
+                        rotation: Math.random() * 30 - 15,
+                        duration: 0.3,
                         ease: 'power2.out',
                         onComplete: () => {
-                            gsap.to(panel, {
-                                rotationY: 0,
-                                rotationX: 0,
-                                duration: 0.6,
-                                ease: 'elastic.out(1, 0.5)'
+                            gsap.to(bolt, {
+                                rotation: 0,
+                                duration: 0.5,
+                                ease: 'elastic.out(1, 0.3)'
                             });
                         }
                     });
                 });
+
+                setTimeout(() => { // Sound and state change logic
+                    const newState = toggleSwitch.getAttribute('data-search') === 'google' ? 'perplexity' : 'google';
+                    if (newState === 'perplexity') { powerUpSound.currentTime = 0; powerUpSound.play(); }
+                    else { powerDownSound.currentTime = 0; powerDownSound.play(); }
+
+                    setTimeout(() => { // Actual state update
+                        toggleSwitch.setAttribute('data-search', newState);
+                        searchEngine = newState;
+                        searchInput.placeholder = newState === 'google' ? "Search the web..." : "Ask Perplexity...";
+                        setTimeout(() => { toggleSwitch.classList.remove('switching'); }, 300);
+                    }, 150);
+                }, 100);
             });
-            
-            // Handle search submission
+
+            // Search Submission Logic
             searchForm.addEventListener('submit', (e) => {
-                e.preventDefault();
+                 e.preventDefault();
                 const searchTerm = searchInput.value.trim();
-                
                 if (searchTerm) {
+                    clickSound.currentTime = 0; clickSound.play();
                     let searchUrl;
                     if (searchEngine === 'google') {
                         searchUrl = `https://www.google.com/search?q=${encodeURIComponent(searchTerm)}`;
                     } else {
                         searchUrl = `https://www.perplexity.ai/search?q=${encodeURIComponent(searchTerm)}`;
                     }
-                    window.open(searchUrl, '_blank');
-                }
-            });
-        }
 
-        // Bitcoin Data API Integrations
-        function initBitcoinData() {
-            // API endpoints
-            const COINGECKO_API_BASE = 'https://api.coingecko.com/api/v3';
-            const MEMPOOL_API_BASE = 'https://mempool.space/api/v1';
-            const BLOCKCHAIN_INFO_API = 'https://blockchain.info';
-            const CRYPTO_NEWS_API = 'https://min-api.cryptocompare.com/data/v2/news/?lang=EN&categories=BTC';
-            
-            // Helper dla ponawiania prób i obsługi błędów
-            async function fetchWithRetry(url, retries = 3, delay = 1000) {
-                let lastError;
-                
-                for (let i = 0; i < retries; i++) {
-                    try {
-                        const response = await fetch(url);
-                        if (!response.ok) {
-                            throw new Error(`HTTP error! Status: ${response.status}`);
-                        }
-                        return await response.json();
-                    } catch (error) {
-                        console.warn(`Attempt ${i + 1} failed: ${error.message}`);
-                        lastError = error;
-                        
-                        if (i < retries - 1) {
-                            // Czekaj przed ponowieniem próby z losowym opóźnieniem
-                            await new Promise(resolve => setTimeout(resolve, delay + Math.random() * 1000));
-                        }
-                    }
-                }
-                
-                throw lastError;
-            }
-            
-            // Get Bitcoin price and market data
-            async function fetchBitcoinPrice() {
-                try {
-                    const data = await fetchWithRetry(`${COINGECKO_API_BASE}/coins/bitcoin?localization=false&tickers=false&community_data=false&developer_data=false`);
-                    
-                    if (data) {
-                        // Update price display
-                        const priceElement = document.getElementById('btc-price');
-                        const changeElement = document.getElementById('btc-change');
-                        const priceUpdateTime = document.getElementById('price-update-time');
-                        
-                        const price = data.market_data.current_price.usd;
-                        const priceChange24h = data.market_data.price_change_percentage_24h;
-                        
-                        priceElement.textContent = `$${formatNumber(price)}`;
-                        changeElement.textContent = `${priceChange24h > 0 ? '+' : ''}${priceChange24h.toFixed(2)}%`;
-                        changeElement.className = `price-change ${priceChange24h >= 0 ? 'positive' : 'negative'}`;
-                        
-                        // Update market data
-                        document.getElementById('market-cap').textContent = `$${formatNumber(data.market_data.market_cap.usd)}`;
-                        document.getElementById('volume').textContent = `$${formatNumber(data.market_data.total_volume.usd)}`;
-                        document.getElementById('circ-supply').textContent = `${formatNumber(data.market_data.circulating_supply)} BTC`;
-                        
-                        const now = new Date();
-                        priceUpdateTime.textContent = `Last updated: ${formatDateTime(now)}`;
-                        document.getElementById('market-update-time').textContent = `Last updated: ${formatDateTime(now)}`;
-                        
-                        // Create/update price chart
-                        createPriceChart('24h');
-                    }
-                } catch (error) {
-                    console.error('Error fetching Bitcoin price:', error);
-                    document.getElementById('btc-price').textContent = 'Data Unavailable';
-                    document.getElementById('btc-price').style.fontSize = '1.5rem';
-                    document.getElementById('market-cap').textContent = 'Unavailable';
-                    document.getElementById('volume').textContent = 'Unavailable';
-                    document.getElementById('circ-supply').textContent = 'Unavailable';
-                    
-                    // Ustaw informację o aktualizacji
-                    const now = new Date();
-                    document.getElementById('price-update-time').textContent = `Error: ${formatDateTime(now)} - Retrying soon`;
-                    document.getElementById('market-update-time').textContent = `Error: ${formatDateTime(now)} - Retrying soon`;
-                    
-                    // Spróbuj ponownie po 30 sekundach
-                    setTimeout(fetchBitcoinPrice, 30000);
-                }
-            }
-            
-            // Create interactive price chart
-            async function createPriceChart(period = '24h') {
-                try {
-                    // Set active button
-                    const buttons = document.querySelectorAll('#price-time-filter button');
-                    buttons.forEach(button => {
-                        button.classList.remove('active');
-                        if (button.getAttribute('data-period') === period) {
-                            button.classList.add('active');
+                    const submitFlashOverlay = document.createElement('div');
+                    submitFlashOverlay.style.position = 'fixed';
+                    submitFlashOverlay.style.top = '0';
+                    submitFlashOverlay.style.left = '0';
+                    submitFlashOverlay.style.width = '100%';
+                    submitFlashOverlay.style.height = '100%';
+                    submitFlashOverlay.style.backgroundColor = 'rgba(0, 243, 255, 0.05)';
+                    submitFlashOverlay.style.zIndex = '999';
+                    submitFlashOverlay.style.pointerEvents = 'none';
+                    document.body.appendChild(submitFlashOverlay);
+
+                    gsap.to(submitFlashOverlay, {
+                        opacity: 0,
+                        duration: 0.3,
+                        onComplete: () => {
+                             if (document.body.contains(submitFlashOverlay)) {
+                                 document.body.removeChild(submitFlashOverlay);
+                             }
+                            window.open(searchUrl, '_blank');
                         }
                     });
-                    
-                    // Map period to API parameters
-                    let days;
-                    switch (period) {
-                        case '24h': days = 1; break;
-                        case '7d': days = 7; break;
-                        case '30d': days = 30; break;
-                        case '3m': days = 90; break;
-                        case '1y': days = 365; break;
-                        default: days = 1;
+                }
+            });
+        } // End initSearchFunctionality
+
+        // Helper function to fetch data with retry logic (Improved Version)
+        async function fetchWithRetry(url, retries = 3, delay = 1000) {
+             let lastError;
+            for (let i = 0; i < retries; i++) {
+                try {
+                    const response = await fetch(url);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! Status: ${response.status}`);
                     }
-                    
-                    const data = await fetchWithRetry(`${COINGECKO_API_BASE}/coins/bitcoin/market_chart?vs_currency=usd&days=${days}`);
-                    
-                    if (data && data.prices) {
-                        const ctx = document.getElementById('price-chart').getContext('2d');
-                        
-                        // Format data for chart
-                        const prices = data.prices;
-                        const labels = [];
-                        const chartData = [];
-                        
-                        prices.forEach(price => {
-                            const date = new Date(price[0]);
-                            let formattedDate;
-                            
-                            if (period === '24h') {
-                                formattedDate = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                            } else if (period === '7d' || period === '30d') {
-                                formattedDate = date.toLocaleDateString([], { month: 'short', day: 'numeric' });
-                            } else {
-                                formattedDate = date.toLocaleDateString([], { month: 'short', day: 'numeric' });
-                            }
-                            
-                            labels.push(formattedDate);
-                            chartData.push(price[1]);
-                        });
-                        
-                        // Check if chart already exists and destroy it
-                        if (window.priceChart) {
-                            window.priceChart.destroy();
-                        }
-                        
-                        // Create gradient for chart
-                        const gradient = ctx.createLinearGradient(0, 0, 0, 200);
-                        gradient.addColorStop(0, 'rgba(0, 243, 255, 0.5)');
-                        gradient.addColorStop(1, 'rgba(0, 243, 255, 0)');
-                        
-                        // Create chart
-                        window.priceChart = new Chart(ctx, {
-                            type: 'line',
-                            data: {
-                                labels: labels,
-                                datasets: [{
-                                    label: 'Price (USD)',
-                                    data: chartData,
-                                    borderColor: '#00f3ff',
-                                    borderWidth: 2,
-                                    backgroundColor: gradient,
-                                    pointBackgroundColor: '#00f3ff',
-                                    pointBorderColor: '#00f3ff',
-                                    pointRadius: 0,
-                                    pointHoverRadius: 4,
-                                    tension: 0.4,
-                                    fill: true
-                                }]
-                            },
-                            options: {
-                                responsive: true,
-                                maintainAspectRatio: false,
-                                plugins: {
-                                    legend: {
-                                        display: false
-                                    },
-                                    tooltip: {
-                                        mode: 'index',
-                                        intersect: false,
-                                        backgroundColor: 'rgba(16, 23, 41, 0.9)',
-                                        titleColor: '#00f3ff',
-                                        bodyColor: '#e0e0ff',
-                                        borderColor: 'rgba(0, 243, 255, 0.3)',
-                                        borderWidth: 1,
-                                        padding: 10,
-                                        displayColors: false,
-                                        callbacks: {
-                                            label: function(context) {
-                                                return `$${formatNumber(context.raw)}`;
-                                            }
-                                        }
-                                    }
-                                },
-                                scales: {
-                                    x: {
-                                        grid: {
-                                            display: false,
-                                            drawBorder: false
-                                        },
-                                        ticks: {
-                                            color: 'rgba(224, 224, 255, 0.5)',
-                                            font: {
-                                                size: 10
-                                            },
-                                            maxRotation: 0,
-                                            maxTicksLimit: 8
-                                        }
-                                    },
-                                    y: {
-                                        grid: {
-                                            color: 'rgba(224, 224, 255, 0.05)',
-                                            drawBorder: false
-                                        },
-                                        ticks: {
-                                            color: 'rgba(224, 224, 255, 0.5)',
-                                            font: {
-                                                size: 10
-                                            },
-                                            callback: function(value) {
-                                                return '$' + value.toLocaleString();
-                                            }
-                                        }
-                                    }
-                                },
-                                interaction: {
-                                    mode: 'index',
-                                    intersect: false
-                                },
-                                animation: {
-                                    duration: 1000,
-                                    easing: 'easeOutQuart'
-                                }
-                            }
-                        });
+                    const text = await response.text();
+                    if (!text) {
+                         console.warn(`Empty response received from ${url}`);
+                         return null;
                     }
+                    return JSON.parse(text);
                 } catch (error) {
-                    console.error('Error creating price chart:', error);
+                    console.warn(`Attempt ${i + 1}/${retries} failed for ${url}: ${error.message}`);
+                    lastError = error;
+                    if (i < retries - 1) {
+                        await new Promise(r => setTimeout(r, delay + Math.random() * 1000));
+                    }
                 }
             }
-            
-            // Fetch mempool and transaction fee data
+            console.error(`Failed to fetch ${url} after ${retries} attempts.`);
+            throw lastError || new Error(`Failed to fetch data from ${url}`);
+        }
+
+        // Bitcoin Data API Integrations (Adapted for Original HTML Structure)
+        function initBitcoinData() {
+            const COINGECKO_API_BASE = 'https://api.coingecko.com/api/v3';
+            const MEMPOOL_API_BASE = 'https://mempool.space/api/v1';
+            const BLOCKCHAIN_INFO_API = 'https://blockchain.info/q';
+            const CRYPTO_NEWS_API = 'https://min-api.cryptocompare.com/data/v2/news/?lang=EN&categories=BTC&limit=5';
+            const CRYPTOCOMPARE_API_BASE = 'https://min-api.cryptocompare.com/data'; // Added for price/chart
+
+            let priceDataSource = 'coingecko'; // Default data source
+            let currentPriceChartPeriod = '24h'; // Track current chart period
+            let currentBtcPriceData = null; // Store last successful price data
+
+            // --- Helper function to set loading state ---
+            function setLoadingState(elementId, isLoading, message = 'Loading...') {
+                 const element = document.getElementById(elementId);
+                 if (!element) return;
+                 if (isLoading) {
+                     // For simple text elements
+                     if (['btc-price', 'btc-change', 'market-cap', 'volume', 'circ-supply', 'fee-low', 'fee-high', 'fee-low-usd', 'fee-high-usd', 'hash-rate', 'difficulty', 'block-height', 'next-halving'].includes(elementId)) {
+                         element.textContent = message;
+                     }
+                     // For chart containers
+                     if (elementId === 'price-chart-container') {
+                          if (window.priceChart) window.priceChart.destroy();
+                          window.priceChart = null; // Ensure chart reference is cleared
+                          element.innerHTML = `<canvas id="price-chart"></canvas><div class="loading"></div>`; // Add canvas back
+                     }
+                 } else {
+                     // Clear loading for charts (actual data will fill it)
+                     if (elementId === 'price-chart-container') {
+                          const loadingDiv = element.querySelector('.loading');
+                          if (loadingDiv) element.removeChild(loadingDiv);
+                     }
+                     // We don't need to clear text elements here, fetch functions will update them
+                 }
+            }
+
+            // --- Get Bitcoin price and market data (Handles Source Switching) ---
+            async function fetchBitcoinPriceAndMarket() {
+                setLoadingState('btc-price', true);
+                setLoadingState('btc-change', true, ''); // Clear change initially
+                setLoadingState('market-cap', true);
+                setLoadingState('volume', true);
+                setLoadingState('circ-supply', true);
+                 currentBtcPriceData = null; // Clear previous data
+
+                 try {
+                     let priceData, marketData;
+
+                     if (priceDataSource === 'coingecko') {
+                         // CoinGecko provides price and market data in one call
+                         priceData = await fetchWithRetry(`${COINGECKO_API_BASE}/coins/bitcoin?localization=false&tickers=false&community_data=false&developer_data=false&sparkline=false`);
+                         marketData = priceData?.market_data;
+                     } else { // cryptocompare
+                         // CryptoCompare needs separate calls
+                         priceData = await fetchWithRetry(`${CRYPTOCOMPARE_API_BASE}/price?fsym=BTC&tsyms=USD`);
+                         // Fetch full data for market cap, volume etc. (less direct than CoinGecko)
+                         const fullData = await fetchWithRetry(`${CRYPTOCOMPARE_API_BASE}/pricemultifull?fsyms=BTC&tsyms=USD`);
+                         if (fullData?.RAW?.BTC?.USD) {
+                           marketData = fullData.RAW.BTC.USD; // Structure is different
+                         } else {
+                            console.warn("Could not retrieve full market data from CryptoCompare.");
+                            marketData = {}; // Assign empty object to avoid errors later
+                         }
+                     }
+
+                     const priceElement = document.getElementById('btc-price');
+                     const changeElement = document.getElementById('btc-change');
+                     const priceUpdateTime = document.getElementById('price-update-time');
+                     const marketUpdateTime = document.getElementById('market-update-time');
+
+                     // Store the successfully fetched data
+                     currentBtcPriceData = { priceData, marketData };
+
+                     if (priceDataSource === 'coingecko' && marketData) {
+                         const price = marketData.current_price?.usd;
+                         priceElement.textContent = price !== undefined ? `$${formatNumber(price)}` : '--';
+
+                         // Get appropriate price change based on currentPriceChartPeriod
+                         let priceChange = marketData.price_change_percentage_24h; // Default to 24h
+                         switch (currentPriceChartPeriod) {
+                             case '7d': priceChange = marketData.price_change_percentage_7d_in_currency?.usd ?? priceChange; break;
+                             case '30d': priceChange = marketData.price_change_percentage_30d_in_currency?.usd ?? priceChange; break;
+                             case '1y': priceChange = marketData.price_change_percentage_1y_in_currency?.usd ?? priceChange; break;
+                             // Note: CoinGecko API doesn't directly provide 3m change in this endpoint. Fallback to 24h.
+                         }
+
+                         if (priceChange !== undefined) {
+                            changeElement.textContent = `${priceChange >= 0 ? '+' : ''}${priceChange.toFixed(2)}%`;
+                            changeElement.className = `price-change ${priceChange >= 0 ? 'positive' : 'negative'}`;
+                         } else {
+                             changeElement.textContent = '--';
+                             changeElement.className = 'price-change';
+                         }
+
+                         document.getElementById('market-cap').textContent = marketData.market_cap?.usd ? `$${formatNumber(marketData.market_cap.usd)}` : '--';
+                         document.getElementById('volume').textContent = marketData.total_volume?.usd ? `$${formatNumber(marketData.total_volume.usd)}` : '--';
+                         document.getElementById('circ-supply').textContent = marketData.circulating_supply ? `${formatNumber(marketData.circulating_supply)} BTC` : '--';
+
+                     } else if (priceDataSource === 'cryptocompare' && priceData && marketData) {
+                         const price = priceData.USD;
+                         const priceChange24h = marketData.CHANGEPCT24HOUR;
+
+                         priceElement.textContent = price !== undefined ? `$${formatNumber(price)}` : '--';
+                         if (priceChange24h !== undefined) {
+                             changeElement.textContent = `${priceChange24h >= 0 ? '+' : ''}${priceChange24h.toFixed(2)}%`;
+                             changeElement.className = `price-change ${priceChange24h >= 0 ? 'positive' : 'negative'}`;
+                         } else {
+                             changeElement.textContent = '--';
+                             changeElement.className = 'price-change';
+                         }
+
+                         document.getElementById('market-cap').textContent = marketData.MKTCAP ? `$${formatNumber(marketData.MKTCAP)}` : '--';
+                         document.getElementById('volume').textContent = marketData.VOLUME24HOURTO ? `$${formatNumber(marketData.VOLUME24HOURTO)}` : '--';
+                         document.getElementById('circ-supply').textContent = marketData.SUPPLY ? `${formatNumber(marketData.SUPPLY)} BTC` : '--';
+
+                     } else {
+                         throw new Error('Price/Market data not found in response from selected source');
+                     }
+
+                     document.getElementById('max-supply').textContent = '21,000,000 BTC';
+                     const now = new Date();
+                     const updateTimeText = `Last updated: ${formatDateTime(now)} (${priceDataSource === 'coingecko' ? 'CG' : 'CC'})`;
+                     priceUpdateTime.textContent = updateTimeText;
+                     marketUpdateTime.textContent = updateTimeText;
+
+                     // Always try to create/update the chart after fetching price data
+                     createPriceChart(currentPriceChartPeriod);
+                     // window.lastPriceDataSource = priceDataSource; // No longer needed here
+
+                 } catch (error) {
+                     console.error(`Error fetching Bitcoin price/market data from ${priceDataSource}:`, error);
+                     document.getElementById('btc-price').textContent = 'Unavailable';
+                     document.getElementById('btc-change').textContent = '';
+                     document.getElementById('market-cap').textContent = '--';
+                     document.getElementById('volume').textContent = '--';
+                     document.getElementById('circ-supply').textContent = '--';
+                     const now = new Date();
+                     const errorMsg = `Error (${priceDataSource === 'coingecko' ? 'CG' : 'CC'}): ${formatDateTime(now)} - Retrying`;
+                     document.getElementById('price-update-time').textContent = errorMsg;
+                     document.getElementById('market-update-time').textContent = errorMsg;
+                     // Also clear chart on fetch error
+                     const chartContainer = document.getElementById('price-chart').parentNode;
+                      if (window.priceChart) window.priceChart.destroy();
+                      window.priceChart = null;
+                      chartContainer.innerHTML = `<canvas id="price-chart"></canvas><div style="position: absolute; top:0; left:0; right:0; bottom:0; display: flex; justify-content: center; align-items: center; height: 100%; color: rgba(224, 224, 255, 0.7); font-size: 0.9rem; text-align: center; padding: 10px;">Price data fetch failed<br>(${priceDataSource === 'coingecko' ? 'CG' : 'CC'}) - Retrying</div>`;
+                     setTimeout(fetchBitcoinPriceAndMarket, 30000);
+                 }
+            }
+
+            // --- Create interactive price chart (Handles Source Switching) ---
+            async function createPriceChart(period = '24h') {
+                // Ensure period matches the globally tracked one
+                period = currentPriceChartPeriod;
+
+                const chartContainer = document.getElementById('price-chart').parentNode; // Get chart-container div
+                 // Check if canvas exists, if not, recreate structure
+                 let canvasElement = document.getElementById('price-chart');
+                 if (!canvasElement) {
+                      chartContainer.innerHTML = '<canvas id="price-chart"></canvas>';
+                      canvasElement = document.getElementById('price-chart');
+                 }
+                 setLoadingState('price-chart-container', true);
+
+                try {
+                    document.querySelectorAll('#price-time-filter button').forEach(btn => btn.classList.remove('active'));
+                    const activeButton = document.querySelector(`#price-time-filter button[data-period="${period}"]`);
+                    if (activeButton) activeButton.classList.add('active');
+
+                    let apiUrl;
+                    let dataProcessor;
+
+                    if (priceDataSource === 'coingecko') {
+                         let days;
+                         switch (period) {
+                            case '24h': days = 1; break;
+                             case '7d': days = 7; break;
+                             case '30d': days = 30; break;
+                             case '3m': days = 90; break;
+                             case '1y': days = 365; break;
+                             default: days = 1;
+                         }
+                         apiUrl = `${COINGECKO_API_BASE}/coins/bitcoin/market_chart?vs_currency=usd&days=${days}`;
+                         dataProcessor = (data) => {
+                             if (!data || !data.prices) throw new Error('Invalid CoinGecko data');
+                             return data.prices.map(price => ({ t: price[0], y: price[1] })); // Format for Chart.js {t, y}
+                         };
+                    } else { // cryptocompare
+                         let endpoint, limit, aggregate;
+                         switch (period) {
+                            case '24h': endpoint = 'histohour'; limit = 24; aggregate = 1; break;
+                             case '7d': endpoint = 'histoday'; limit = 7; aggregate = 1; break;
+                             case '30d': endpoint = 'histoday'; limit = 30; aggregate = 1; break;
+                             case '3m': endpoint = 'histoday'; limit = 90; aggregate = 1; break;
+                             case '1y': endpoint = 'histoday'; limit = 365; aggregate = 1; break;
+                             default: endpoint = 'histohour'; limit = 24; aggregate = 1;
+                         }
+                         // Note: CryptoCompare free tier might limit historical data points
+                         apiUrl = `${CRYPTOCOMPARE_API_BASE}/${endpoint}?fsym=BTC&tsym=USD&limit=${limit}&aggregate=${aggregate}`;
+                         dataProcessor = (data) => {
+                             // Updated CryptoCompare processing based on observed structure
+                             // Check specifically for the nested Data array which holds the points
+                             if (!data || data.Response !== "Success" || !Array.isArray(data.Data?.Data) || data.Data.Data.length === 0) {
+                                 console.error("Invalid or empty CryptoCompare data structure received:", data);
+                                 throw new Error(`Invalid or empty CryptoCompare data structure: ${JSON.stringify(data || 'null').substring(0, 100)}`);
+                             }
+                             // Ensure 'time' and 'close' properties exist in the first point as a sanity check
+                             if (data.Data.Data[0]?.time === undefined || data.Data.Data[0]?.close === undefined) {
+                               console.error("CryptoCompare data points missing expected keys ('time', 'close'):", data.Data.Data[0]);
+                               throw new Error('CryptoCompare data points missing expected keys');
+                             }
+                             return data.Data.Data.map(item => ({ t: item.time * 1000, y: item.close })); // Use closing price
+                         };
+                    }
+
+                    const rawData = await fetchWithRetry(apiUrl);
+                    const chartPoints = dataProcessor(rawData);
+
+                    // Clear loading state before drawing chart
+                    setLoadingState('price-chart-container', false);
+
+                    const ctx = document.getElementById('price-chart').getContext('2d');
+                    if (window.priceChart) window.priceChart.destroy();
+                    window.priceChart = null; // Clear ref before creating new one
+
+                    const gradient = ctx.createLinearGradient(0, 0, 0, 200);
+                    gradient.addColorStop(0, 'rgba(0, 243, 255, 0.5)');
+                    gradient.addColorStop(1, 'rgba(0, 243, 255, 0)');
+
+                    window.priceChart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            datasets: [{
+                                label: 'Price (USD)',
+                                data: chartPoints, // Use processed {t, y} points
+                                borderColor: '#00f3ff',
+                                borderWidth: 2,
+                                backgroundColor: gradient,
+                                pointRadius: 0,
+                                tension: 0.4,
+                                fill: true
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: {
+                                    mode: 'index',
+                                    intersect: false,
+                                    backgroundColor: 'rgba(16, 23, 41, 0.9)',
+                                    titleColor: '#00f3ff',
+                                    bodyColor: '#e0e0ff',
+                                    borderColor: 'rgba(0, 243, 255, 0.3)',
+                                    borderWidth: 1,
+                                    padding: 10,
+                                    displayColors: false,
+                                    callbacks: {
+                                        label: function(context) {
+                                            return `$${formatNumber(context.raw.y)}`; // Access y value
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    type: 'time', // Use time scale
+                                    grid: { display: false, drawBorder: false },
+                                    time: {
+                                        unit: period === '24h' ? 'hour' : 'day', // Adjust unit based on period
+                                        tooltipFormat: 'MMM d, yyyy HH:mm', // More detailed tooltip
+                                        displayFormats: {
+                                            hour: 'HH:mm', // Format for 24h
+                                            day: 'MMM d'   // Format for longer periods
+                                        }
+                                    },
+                                    ticks: {
+                                        color: 'rgba(224, 224, 255, 0.5)',
+                                        font: { size: 10 },
+                                        maxRotation: 0,
+                                        autoSkip: true,
+                                        maxTicksLimit: 8
+                                    }
+                                },
+                                y: {
+                                    grid: { color: 'rgba(224, 224, 255, 0.05)', drawBorder: false },
+                                    ticks: {
+                                        color: 'rgba(224, 224, 255, 0.5)',
+                                        font: { size: 10 },
+                                        callback: function(value) {
+                                            return '$' + value.toLocaleString();
+                                        }
+                                    }
+                                }
+                            },
+                            interaction: { mode: 'nearest', axis: 'x', intersect: false }, // Optimize interaction
+                            animation: { duration: 800, easing: 'easeOutQuart' } // Faster animation
+                        }
+                    });
+                } catch (error) {
+                    console.error(`Error creating price chart from ${priceDataSource} for ${period}:`, error);
+                    setLoadingState('price-chart-container', false); // Clear loading on error
+                     const chartContainer = document.getElementById('price-chart').parentNode;
+                      if (window.priceChart) window.priceChart.destroy();
+                      window.priceChart = null;
+                     chartContainer.innerHTML = `<canvas id="price-chart"></canvas><div style="position: absolute; top:0; left:0; right:0; bottom:0; display: flex; justify-content: center; align-items: center; height: 100%; color: rgba(224, 224, 255, 0.7); font-size: 0.9rem; text-align: center; padding: 10px;">Chart data unavailable<br>(${priceDataSource === 'coingecko' ? 'CG' : 'CC'}) - Retrying</div>`;
+                     // Attempt to reload chart data after a delay
+                     setTimeout(() => createPriceChart(currentPriceChartPeriod), 30000);
+                 }
+            }
+
+            // Fetch mempool and transaction fee data (Adapted for Original HTML)
             async function fetchMempoolData() {
+                 setLoadingState('fee-low', true, '--');
+                 setLoadingState('fee-high', true, '--');
+                 setLoadingState('fee-low-usd', true, '$--');
+                 setLoadingState('fee-high-usd', true, '$--');
                 try {
                     const data = await fetchWithRetry(`${MEMPOOL_API_BASE}/fees/recommended`);
-                    
+
                     if (data) {
                         const lowFee = data.hourFee;
                         const highFee = data.fastestFee;
-                        
+
                         document.getElementById('fee-low').textContent = `${lowFee} sat/vB`;
                         document.getElementById('fee-high').textContent = `${highFee} sat/vB`;
-                        
-                        // Get BTC price to calculate USD value
+
+                        let btcPriceUsd = 0;
                         try {
-                            const priceData = await fetchWithRetry(`${COINGECKO_API_BASE}/simple/price?ids=bitcoin&vs_currencies=usd`);
-                            
-                            if (priceData && priceData.bitcoin) {
-                                const btcPrice = priceData.bitcoin.usd;
-                                
-                                // Assume a typical transaction size of 250 bytes
-                                const txSize = 250;
-                                const lowFeeUsd = (lowFee * txSize * 0.00000001 * btcPrice).toFixed(2);
-                                const highFeeUsd = (highFee * txSize * 0.00000001 * btcPrice).toFixed(2);
-                                
-                                document.getElementById('fee-low-usd').textContent = `$${lowFeeUsd}`;
-                                document.getElementById('fee-high-usd').textContent = `$${highFeeUsd}`;
-                            }
-                        } catch (priceError) {
-                            console.error('Error fetching Bitcoin price for fee calculation:', priceError);
-                            document.getElementById('fee-low-usd').textContent = 'Unavailable';
-                            document.getElementById('fee-high-usd').textContent = 'Unavailable';
+                            // Use the current price source for conversion
+                             if (priceDataSource === 'coingecko' && currentBtcPriceData && currentBtcPriceData.marketData) {
+                                 btcPriceUsd = currentBtcPriceData.marketData.current_price?.usd;
+                             } else if (priceDataSource === 'cryptocompare' && currentBtcPriceData && currentBtcPriceData.priceData) {
+                                 btcPriceUsd = currentBtcPriceData.priceData.USD;
+                             }
+                        } catch (e) { console.warn('Could not fetch BTC price for fee conversion:', e); }
+
+                        if (btcPriceUsd > 0) {
+                            const txSize = 250;
+                            const satsToBtc = 1e-8;
+                            document.getElementById('fee-low-usd').textContent = `$${(lowFee * txSize * satsToBtc * btcPriceUsd).toFixed(2)}`;
+                            document.getElementById('fee-high-usd').textContent = `$${(highFee * txSize * satsToBtc * btcPriceUsd).toFixed(2)}`;
+                        } else {
+                            document.getElementById('fee-low-usd').textContent = '$--';
+                            document.getElementById('fee-high-usd').textContent = '$--';
                         }
-                        
-                        // Create mempool chart
-                        createMempoolChart();
-                        
-                        const now = new Date();
-                        document.getElementById('mempool-update-time').textContent = `Last updated: ${formatDateTime(now)}`;
+                        document.getElementById('mempool-update-time').textContent = `Last updated: ${formatDateTime(new Date())}`;
+                    } else {
+                         throw new Error("Missing mempool fee data");
                     }
                 } catch (error) {
                     console.error('Error fetching mempool data:', error);
-                    document.getElementById('fee-low').textContent = 'Unavailable';
-                    document.getElementById('fee-high').textContent = 'Unavailable';
-                    document.getElementById('fee-low-usd').textContent = 'Unavailable';
-                    document.getElementById('fee-high-usd').textContent = 'Unavailable';
-                    
-                    // Ustaw informację o aktualizacji
-                    const now = new Date();
-                    document.getElementById('mempool-update-time').textContent = `Error: ${formatDateTime(now)} - Retrying soon`;
-                    
-                    // Spróbuj ponownie po 30 sekundach
-                    setTimeout(fetchMempoolData, 30000);
-                }
+                     document.getElementById('fee-low').textContent = '--';
+                     document.getElementById('fee-high').textContent = '--';
+                     document.getElementById('fee-low-usd').textContent = '$--';
+                     document.getElementById('fee-high-usd').textContent = '$--';
+                     const now = new Date();
+                     document.getElementById('mempool-update-time').textContent = `Error: ${formatDateTime(now)} - Retrying`;
+                     setTimeout(fetchMempoolData, 30000);
+                 }
             }
-            
-            // Create mempool visualization
-            async function createMempoolChart() {
-                try {
-                    const blocks = await fetchWithRetry(`${MEMPOOL_API_BASE}/fees/mempool-blocks`);
-                    
-                    if (blocks && blocks.length > 0) {
-                        const ctx = document.getElementById('mempool-chart').getContext('2d');
-                        
-                        // Format data for chart
-                        const labels = [];
-                        const feeData = [];
-                        const txData = [];
-                        
-                        // We'll use the first 6 blocks (or less if fewer are available)
-                        const blockCount = Math.min(blocks.length, 6);
-                        
-                        for (let i = 0; i < blockCount; i++) {
-                            labels.push(`Block ${i+1}`);
-                            feeData.push(blocks[i].medianFee);
-                            
-                            // Scale down transaction count for better visualization
-                            const txCount = blocks[i].nTx;
-                            txData.push(txCount / 50);
-                        }
-                        
-                        // Check if chart already exists and destroy it
-                        if (window.mempoolChart) {
-                            window.mempoolChart.destroy();
-                        }
-                        
-                        // Create chart
-                        window.mempoolChart = new Chart(ctx, {
-                            type: 'bar',
-                            data: {
-                                labels: labels,
-                                datasets: [
-                                    {
-                                        label: 'Median Fee (sat/vB)',
-                                        data: feeData,
-                                        backgroundColor: 'rgba(0, 243, 255, 0.7)',
-                                        borderColor: '#00f3ff',
-                                        borderWidth: 1
-                                    },
-                                    {
-                                        label: 'Transaction Count (scaled)',
-                                        data: txData,
-                                        backgroundColor: 'rgba(255, 0, 255, 0.7)',
-                                        borderColor: '#ff00ff',
-                                        borderWidth: 1
-                                    }
-                                ]
-                            },
-                            options: {
-                                responsive: true,
-                                maintainAspectRatio: false,
-                                plugins: {
-                                    legend: {
-                                        display: true,
-                                        labels: {
-                                            color: 'rgba(224, 224, 255, 0.7)',
-                                            font: {
-                                                size: 10
-                                            }
-                                        }
-                                    },
-                                    tooltip: {
-                                        backgroundColor: 'rgba(16, 23, 41, 0.9)',
-                                        titleColor: '#00f3ff',
-                                        bodyColor: '#e0e0ff',
-                                        callbacks: {
-                                            label: function(context) {
-                                                if (context.dataset.label.includes('Fee')) {
-                                                    return `${context.raw} sat/vB`;
-                                                } else {
-                                                    return `${Math.round(context.raw * 50)} transactions`;
-                                                }
-                                            }
-                                        }
-                                    }
-                                },
-                                scales: {
-                                    x: {
-                                        grid: {
-                                            display: false
-                                        },
-                                        ticks: {
-                                            color: 'rgba(224, 224, 255, 0.5)',
-                                            font: {
-                                                size: 10
-                                            }
-                                        }
-                                    },
-                                    y: {
-                                        grid: {
-                                            color: 'rgba(224, 224, 255, 0.05)'
-                                        },
-                                        ticks: {
-                                            color: 'rgba(224, 224, 255, 0.5)',
-                                            font: {
-                                                size: 10
-                                            }
-                                        }
-                                    }
-                                },
-                                animation: {
-                                    duration: 1000,
-                                    easing: 'easeOutBounce'
-                                }
-                            }
-                        });
-                    }
-                } catch (error) {
-                    console.error('Error creating mempool chart:', error);
-                }
-            }
-            
-            // Fetch network statistics
+
+             // Fetch network statistics (Adapted for Original HTML)
             async function fetchNetworkStats() {
-                try {
-                    // Użyj alternatywnego źródła dla hashtate, ponieważ blockchain.info może mieć problemy
-                    // Spróbuj najpierw blockchain.info
-                    let stats = null;
-                    try {
-                        stats = await fetchWithRetry(`${BLOCKCHAIN_INFO_API}/stats?format=json&cors=true`);
-                    } catch (blockchainError) {
-                        console.warn('Failed to fetch from blockchain.info, using backup API:', blockchainError);
-                        // Użyj zapasowego API z CoinGecko dla danych sieci
-                        const btcData = await fetchWithRetry(`${COINGECKO_API_BASE}/coins/bitcoin?localization=false&tickers=false&market_data=false&community_data=false&sparkline=false`);
-                        stats = {
-                            n_blocks_total: btcData.block_time_in_minutes ? parseInt(btcData.market_data?.circulating_supply / 6.25) : 0,
-                            difficulty: btcData.hashing_algorithm ? btcData.market_data?.circulating_supply * 1e9 : 0,
-                            // Alternatywnie możemy użyć szacowanego hash rate
-                            hash_rate: btcData.hashing_algorithm ? 120e18 : 0, // Przybliżona wartość w EH/s
-                        };
-                    }
-                    
-                    if (stats) {
-                        // Napraw problem z hash_rate
-                        const hashRateEH = stats.hash_rate / 1000000000000000000;
-                        // Sprawdź czy hash rate jest rozsądną wartością
-                        if (hashRateEH < 0.01 || isNaN(hashRateEH)) {
-                            // Jeśli wartość jest zbyt mała lub nieprawidłowa, użyj szacunkowej wartości
-                            document.getElementById('hash-rate').textContent = `120.00 EH/s (estimated)`;
-                        } else {
-                            // Jeśli wartość jest prawidłowa, wyświetl ją
-                            document.getElementById('hash-rate').textContent = `${hashRateEH.toFixed(2)} EH/s`;
-                        }
-                        
-                        document.getElementById('difficulty').textContent = formatNumber(stats.difficulty);
-                        document.getElementById('block-height').textContent = formatNumber(stats.n_blocks_total);
-                        
-                        // Calculate next halving
-                        const currentBlock = stats.n_blocks_total;
-                        const nextHalvingBlock = Math.ceil(currentBlock / 210000) * 210000;
-                        const blocksUntilHalving = nextHalvingBlock - currentBlock;
-                        const daysUntilHalving = Math.floor(blocksUntilHalving * 10 / 1440); // Assuming 10 min per block
-                        
-                        document.getElementById('next-halving').textContent = `${formatNumber(blocksUntilHalving)} blocks (~${daysUntilHalving} days)`;
-                        
-                        const now = new Date();
-                        document.getElementById('network-update-time').textContent = `Last updated: ${formatDateTime(now)}`;
-                    }
-                } catch (error) {
-                    console.error('Error fetching network stats:', error);
-                    document.getElementById('hash-rate').textContent = 'Unavailable';
-                    document.getElementById('difficulty').textContent = 'Unavailable';
-                    document.getElementById('block-height').textContent = 'Unavailable';
-                    document.getElementById('next-halving').textContent = 'Unavailable';
-                    
-                    // Ustaw informację o aktualizacji
-                    const now = new Date();
-                    document.getElementById('network-update-time').textContent = `Error: ${formatDateTime(now)} - Retrying soon`;
-                    
-                    // Spróbuj ponownie po 30 sekundach
-                    setTimeout(fetchNetworkStats, 30000);
-                }
+                 setLoadingState('hash-rate', true, '-- EH/s');
+                 setLoadingState('difficulty', true, '--');
+                 setLoadingState('block-height', true, '--');
+                 setLoadingState('next-halving', true, '--');
+                 try {
+                     let hashRate = 0, difficulty = 0, blockHeight = 0;
+                     const [hashRateRes, difficultyRes, blockHeightRes] = await Promise.allSettled([
+                         fetchWithRetry(`${BLOCKCHAIN_INFO_API}/hashrate`), // TH/s
+                         fetchWithRetry(`${BLOCKCHAIN_INFO_API}/getdifficulty`),
+                         fetchWithRetry(`${BLOCKCHAIN_INFO_API}/getblockcount`)
+                     ]);
+
+                     if (hashRateRes.status === 'fulfilled') {
+                         hashRate = hashRateRes.value / 1e6; // TH/s to EH/s
+                     } else {
+                         console.warn("Primary hash rate fetch failed, using estimate.");
+                         hashRate = 120; // Fallback estimate
+                     }
+
+                     if (difficultyRes.status === 'fulfilled') difficulty = difficultyRes.value;
+                     if (blockHeightRes.status === 'fulfilled') blockHeight = blockHeightRes.value;
+
+                     const hashRateElement = document.getElementById('hash-rate');
+                     if (hashRate > 0.01 && !isNaN(hashRate)) {
+                         hashRateElement.textContent = `${hashRate.toFixed(2)} EH/s`;
+                     } else {
+                         console.warn("Hash rate invalid, using estimate.");
+                         hashRateElement.textContent = `~120.00 EH/s (est.)`;
+                     }
+
+                     document.getElementById('difficulty').textContent = formatNumber(difficulty) || '--';
+                     document.getElementById('block-height').textContent = formatNumber(blockHeight) || '--';
+
+                    if (blockHeight > 0) {
+                         const currentBlock = blockHeight;
+                         const blocksPerHalving = 210000;
+                         const nextHalvingBlock = Math.ceil(currentBlock / blocksPerHalving) * blocksPerHalving;
+                         const blocksUntilHalving = nextHalvingBlock - currentBlock;
+                         const daysUntilHalving = Math.floor(blocksUntilHalving / 144);
+                         document.getElementById('next-halving').textContent = `${formatNumber(blocksUntilHalving)} blocks (~${daysUntilHalving} days)`;
+                     } else {
+                         document.getElementById('next-halving').textContent = '--';
+                     }
+                     document.getElementById('network-update-time').textContent = `Last updated: ${formatDateTime(new Date())}`;
+                 } catch (error) {
+                     console.error('Error fetching network stats:', error);
+                     document.getElementById('hash-rate').textContent = 'Unavailable';
+                     document.getElementById('difficulty').textContent = 'Unavailable';
+                     document.getElementById('block-height').textContent = 'Unavailable';
+                     document.getElementById('next-halving').textContent = 'Unavailable';
+                     const now = new Date();
+                     document.getElementById('network-update-time').textContent = `Error: ${formatDateTime(now)} - Retrying`;
+                     setTimeout(fetchNetworkStats, 60000);
+                 }
             }
-            
-            // Fetch latest transactions
-            async function fetchLatestTransactions() {
-                try {
-                    const data = await fetchWithRetry(`${BLOCKCHAIN_INFO_API}/unconfirmed-transactions?format=json&cors=true`);
-                    
-                    if (data && data.txs) {
-                        const transactionsContainer = document.getElementById('latest-transactions');
-                        // Clear loading indicator
-                        transactionsContainer.innerHTML = '';
-                        
-                        // Create transactions list
-                        const transactionsList = document.createElement('div');
-                        transactionsList.className = 'transactions-list';
-                        
-                        // Show only 5 latest transactions
-                        const transactions = data.txs.slice(0, 5);
-                        
-                        transactions.forEach(tx => {
-                            const txItem = document.createElement('div');
-                            txItem.className = 'transaction-item';
-                            
-                            // Convert satoshis to BTC and format value
-                            const btcValue = (tx.value / 100000000).toFixed(4);
-                            
-                            // Format the time
-                            const txTime = new Date(tx.time * 1000);
-                            const timeAgo = getTimeAgo(txTime);
-                            
-                            // Create hash with ellipsis in middle
-                            const hash = tx.hash;
-                            const truncatedHash = `${hash.substring(0, 8)}...${hash.substring(hash.length - 8)}`;
-                            
-                            txItem.innerHTML = `
-                                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                                    <div style="font-size: 0.9rem; color: var(--neon-blue);">${truncatedHash}</div>
-                                    <div style="font-size: 0.9rem; font-weight: 600;">${btcValue} BTC</div>
-                                </div>
-                                <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: rgba(224, 224, 255, 0.7);">
-                                    <div>Fee: ${(tx.fee / 100000000).toFixed(8)} BTC</div>
-                                    <div>${timeAgo}</div>
-                                </div>
-                                <div style="height: 1px; background: rgba(0, 243, 255, 0.2); margin: 10px 0;"></div>
-                            `;
-                            
-                            transactionsList.appendChild(txItem);
-                        });
-                        
-                        transactionsContainer.appendChild(transactionsList);
-                        
-                        // Add update time
-                        const updateTime = document.createElement('div');
-                        updateTime.className = 'update-time';
-                        updateTime.id = 'transactions-update-time';
-                        updateTime.textContent = `Last updated: ${formatDateTime(new Date())}`;
-                        transactionsContainer.appendChild(updateTime);
-                    }
-                } catch (error) {
-                    console.error('Error fetching latest transactions:', error);
-                    const transactionsContainer = document.getElementById('latest-transactions');
-                    transactionsContainer.innerHTML = `
-                        <div style="text-align: center; color: rgba(224, 224, 255, 0.7);">Unable to load transactions</div>
-                        <div class="update-time" id="transactions-update-time">Last updated: --</div>
-                    `;
-                    
-                    // Ustaw informację o aktualizacji
-                    const now = new Date();
-                    document.getElementById('transactions-update-time').textContent = `Error: ${formatDateTime(now)} - Retrying soon`;
-                    
-                    // Spróbuj ponownie po 30 sekundach
-                    setTimeout(fetchLatestTransactions, 30000);
-                }
+
+             // Fetch latest transactions (Using newer Mempool.space API for reliability)
+             async function fetchLatestTransactions() {
+                const transactionsContainer = document.getElementById('latest-transactions');
+                 // Simplified loading state for list container
+                 transactionsContainer.innerHTML = '<div class="loading"></div>';
+                 try {
+                    const data = await fetchWithRetry(`${MEMPOOL_API_BASE}/mempool/recent`);
+
+                     if (data && Array.isArray(data)) {
+                         transactionsContainer.innerHTML = ''; // Clear loading
+                         const transactionsList = document.createElement('div');
+                         transactionsList.className = 'transactions-list';
+                         const transactions = data.slice(0, 5);
+
+                         if(transactions.length === 0) {
+                              transactionsContainer.innerHTML = '<div style="text-align: center; color: rgba(224, 224, 255, 0.7); padding: 20px;">No recent transactions in mempool.</div>';
+                         } else {
+                             transactions.forEach(tx => {
+                                 const txItem = document.createElement('div');
+                                 txItem.className = 'transaction-item';
+                                 const shortTxid = `${tx.txid.substring(0, 8)}...${tx.txid.substring(tx.txid.length - 8)}`;
+                                 const btcValue = (tx.value / 1e8).toFixed(4);
+                                 const feeBTC = (tx.fee / 1e8).toFixed(8);
+
+                                 txItem.innerHTML = `
+                                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                                         <div style="font-size: 0.9rem; color: var(--neon-blue); word-break: break-all; margin-right: 10px;">${shortTxid}</div>
+                                         <div style="font-size: 0.9rem; font-weight: 600; white-space: nowrap;">${btcValue} BTC</div>
+                                     </div>
+                                     <div style="display: flex; justify-content: flex-start; font-size: 0.8rem; color: rgba(224, 224, 255, 0.7);">
+                                         <div>Fee: ${feeBTC} BTC</div>
+                                     </div>
+                                 `;
+                                 transactionsList.appendChild(txItem);
+                             });
+                              transactionsContainer.appendChild(transactionsList);
+                         }
+
+                         const updateTimeDiv = document.createElement('div');
+                         updateTimeDiv.className = 'update-time';
+                         updateTimeDiv.id = 'transactions-update-time';
+                         updateTimeDiv.textContent = `Last updated: ${formatDateTime(new Date())}`;
+                         transactionsContainer.appendChild(updateTimeDiv);
+
+                     } else {
+                          throw new Error("Invalid recent transaction data received");
+                     }
+                 } catch (error) {
+                     console.error('Error fetching latest transactions:', error);
+                     transactionsContainer.innerHTML = `
+                         <div style="text-align: center; color: rgba(224, 224, 255, 0.7); padding: 20px;">Unable to load transactions</div>
+                         <div class="update-time" id="transactions-update-time">Last updated: --</div>
+                     `;
+                     const now = new Date();
+                     const updateTimeElement = transactionsContainer.querySelector('#transactions-update-time');
+                     if (updateTimeElement) {
+                         updateTimeElement.textContent = `Error: ${formatDateTime(now)} - Retrying`;
+                     }
+                     setTimeout(fetchLatestTransactions, 30000);
+                 }
             }
-            
-            // Fetch Bitcoin news
+
+            // Fetch Bitcoin news (Using newer API and structure)
             async function fetchBitcoinNews() {
+                 const newsContainer = document.getElementById('bitcoin-news');
+                 newsContainer.innerHTML = '<div class="loading"></div>'; // Show loading
                 try {
                     const data = await fetchWithRetry(CRYPTO_NEWS_API);
-                    
-                    if (data && data.Data) {
-                        const newsContainer = document.getElementById('bitcoin-news');
-                        // Clear loading indicator
+
+                    if (data && data.Data && data.Data.length > 0) {
                         newsContainer.innerHTML = '';
-                        
-                        // Create news list
                         const newsList = document.createElement('div');
                         newsList.className = 'news-list';
-                        
-                        // Show only 3 latest news items
-                        const newsItems = data.Data.slice(0, 3);
-                        
+                        const newsItems = data.Data.slice(0, 5);
+
                         newsItems.forEach(item => {
                             const newsItem = document.createElement('div');
                             newsItem.className = 'news-item';
-                            
                             const pubDate = new Date(item.published_on * 1000);
                             const timeAgo = getTimeAgo(pubDate);
-                            
+
                             newsItem.innerHTML = `
-                                <div style="font-size: 0.95rem; font-weight: 500; margin-bottom: 5px;">${item.title}</div>
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                                    <div style="font-size: 0.8rem; color: rgba(224, 224, 255, 0.7);">${item.source}</div>
-                                    <div style="font-size: 0.8rem; color: rgba(224, 224, 255, 0.7);">${timeAgo}</div>
+                                <div style="font-size: 0.9rem; font-weight: 500; margin-bottom: 5px;">${item.title}</div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                    <div style="font-size: 0.75rem; color: rgba(224, 224, 255, 0.7);">${item.source}</div>
+                                    <div style="font-size: 0.75rem; color: rgba(224, 224, 255, 0.7);">${timeAgo}</div>
                                 </div>
-                                <a href="${item.url}" target="_blank" style="
-                                    display: inline-block;
-                                    padding: 5px 12px;
-                                    background: rgba(0, 243, 255, 0.1);
-                                    border: 1px solid var(--neon-blue);
-                                    color: var(--text-color);
-                                    text-decoration: none;
-                                    border-radius: 20px;
-                                    font-size: 0.8rem;
-                                    margin-top: 5px;
-                                    transition: all 0.3s ease;
-                                ">Read More</a>
-                                <div style="height: 1px; background: rgba(0, 243, 255, 0.2); margin: 15px 0;"></div>
+                                <a href="${item.url}" target="_blank">Read More</a>
                             `;
-                            
                             newsList.appendChild(newsItem);
                         });
-                        
                         newsContainer.appendChild(newsList);
-                        
-                        // Add update time
-                        const updateTime = document.createElement('div');
-                        updateTime.className = 'update-time';
-                        updateTime.id = 'news-update-time';
-                        updateTime.textContent = `Last updated: ${formatDateTime(new Date())}`;
-                        newsContainer.appendChild(updateTime);
+                        const updateTimeDiv = document.createElement('div');
+                        updateTimeDiv.className = 'update-time';
+                        updateTimeDiv.id = 'news-update-time';
+                        updateTimeDiv.textContent = `Last updated: ${formatDateTime(new Date())}`;
+                        newsContainer.appendChild(updateTimeDiv);
+                    } else {
+                         throw new Error("No news data received from API");
                     }
                 } catch (error) {
                     console.error('Error fetching Bitcoin news:', error);
-                    const newsContainer = document.getElementById('bitcoin-news');
                     newsContainer.innerHTML = `
-                        <div style="text-align: center; color: rgba(224, 224, 255, 0.7);">Unable to load news</div>
+                        <div style="text-align: center; color: rgba(224, 224, 255, 0.7); padding: 20px;">Unable to load news</div>
                         <div class="update-time" id="news-update-time">Last updated: --</div>
                     `;
-                    
-                    // Ustaw informację o aktualizacji
-                    const now = new Date();
-                    document.getElementById('news-update-time').textContent = `Error: ${formatDateTime(now)} - Retrying soon`;
-                    
-                    // Spróbuj ponownie po 30 sekundach
-                    setTimeout(fetchBitcoinNews, 30000);
-                }
+                     const now = new Date();
+                     const updateTimeElement = newsContainer.querySelector('#news-update-time');
+                     if (updateTimeElement) {
+                         updateTimeElement.textContent = `Error: ${formatDateTime(now)} - Retrying`;
+                     }
+                     setTimeout(fetchBitcoinNews, 60000);
+                 }
             }
-            
-            // Utility function to format large numbers
+
+            // Utility function to format large numbers (Adapted from Original)
             function formatNumber(num) {
-                if (num === undefined || num === null) return '--';
-                
-                if (num >= 1000000000) {
-                    return (num / 1000000000).toFixed(2) + 'B';
-                }
-                if (num >= 1000000) {
-                    return (num / 1000000).toFixed(2) + 'M';
-                }
-                if (num >= 1000) {
-                    return (num / 1000).toFixed(2) + 'K';
-                }
-                
-                return num.toLocaleString();
+                if (num === undefined || num === null || isNaN(num)) return '--';
+                num = parseFloat(num);
+                 if (num >= 1e12) return (num / 1e12).toFixed(2) + ' T';
+                 if (num >= 1e9) return (num / 1e9).toFixed(2) + ' B';
+                 if (num >= 1e6) return (num / 1e6).toFixed(2) + ' M';
+                 if (num >= 1e3) return (num / 1e3).toFixed(2) + ' K';
+                return num.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: num < 1 ? 8 : 0 });
             }
-            
-            // Format date and time
+
+            // Format date and time (Adapted from Original - shorter format)
             function formatDateTime(date) {
-                return date.toLocaleString([], {
-                    year: 'numeric',
-                    month: 'short',
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                });
+                 if (!date || !(date instanceof Date)) return '--';
+                try {
+                     return date.toLocaleString([], {
+                         month: 'short',
+                         day: 'numeric',
+                         hour: '2-digit',
+                         minute: '2-digit'
+                     });
+                 } catch (e) { console.error("Error formatting date:", e); return '--'; }
             }
-            
-            // Get time ago string (e.g. "5 min ago")
+
+            // Get time ago string (Adapted from Original)
             function getTimeAgo(date) {
+                 if (!date || !(date instanceof Date)) return '--';
                 const now = new Date();
                 const diffMs = now - date;
-                const diffSec = Math.floor(diffMs / 1000);
-                
-                if (diffSec < 60) return 'just now';
-                if (diffSec < 3600) return `${Math.floor(diffSec / 60)} min ago`;
-                if (diffSec < 86400) return `${Math.floor(diffSec / 3600)} hours ago`;
-                return `${Math.floor(diffSec / 86400)} days ago`;
+                const diffSec = Math.round(diffMs / 1000);
+                if (diffSec < 5) return 'just now';
+                if (diffSec < 60) return `${diffSec}s ago`;
+                if (diffSec < 3600) return `${Math.round(diffSec / 60)}m ago`;
+                if (diffSec < 86400) return `${Math.round(diffSec / 3600)}h ago`;
+                return `${Math.round(diffSec / 86400)}d ago`;
             }
-            
+
+            // --- Event Listener for Data Source Toggle ---
+            document.querySelectorAll('#price-data-source .source-button').forEach(button => {
+                 button.addEventListener('click', () => {
+                     const newSource = button.getAttribute('data-source');
+                     if (newSource !== priceDataSource) {
+                         // Update state
+                         priceDataSource = newSource;
+                         // Update button styles
+                         document.querySelectorAll('#price-data-source .source-button').forEach(btn => btn.classList.remove('active'));
+                         button.classList.add('active');
+                         // Fetch new data immediately
+                         fetchBitcoinPriceAndMarket(); // This will also trigger chart update
+                     }
+                 });
+             });
+
             // Add event listeners for price chart time filters
             document.querySelectorAll('#price-time-filter button').forEach(button => {
                 button.addEventListener('click', () => {
                     const period = button.getAttribute('data-period');
-                    createPriceChart(period);
+                    if (period !== currentPriceChartPeriod) {
+                        currentPriceChartPeriod = period; // Update global period
+                        // Fetch new price/market data, which will trigger chart update & update % change
+                        fetchBitcoinPriceAndMarket();
+                    }
                 });
             });
-            
-            // Initialize all data
-            fetchBitcoinPrice();
+
+            // Initialize all data fetches
+            fetchBitcoinPriceAndMarket();
             fetchMempoolData();
             fetchNetworkStats();
             fetchLatestTransactions();
             fetchBitcoinNews();
-            
-            // Set up auto-refresh intervals for different data types
-            setInterval(fetchBitcoinPrice, 60000); // Every minute
-            setInterval(fetchMempoolData, 2 * 60000); // Every 2 minutes
-            setInterval(fetchNetworkStats, 5 * 60000); // Every 5 minutes
-            setInterval(fetchLatestTransactions, 60000); // Every minute
-            setInterval(fetchBitcoinNews, 10 * 60000); // Every 10 minutes
-        }
+
+            // Set up auto-refresh intervals (Using newer intervals)
+            setInterval(fetchBitcoinPriceAndMarket, 60000);
+            setInterval(fetchMempoolData, 2 * 60000);
+            setInterval(fetchNetworkStats, 5 * 60000);
+            setInterval(fetchLatestTransactions, 30000);
+            setInterval(fetchBitcoinNews, 10 * 60000);
+        } // End initBitcoinData
 
         // Wait for DOM content to load before initializing
         document.addEventListener('DOMContentLoaded', () => {
-            initThreeJSBackground();
-            initSearchFunctionality();
-            initBitcoinData();
-            
-            // Add tilt effect to panels
+            initThreeJSBackground(); // Initialize ORIGINAL background
+            initSearchFunctionality(); // Initialize search with NEW toggle
+            initBitcoinData(); // Initialize data fetching (adapted for original HTML)
+
+            // Original Tilt/Shine Effect Logic (from BTCsimulator/index.html)
             const panels = document.querySelectorAll('.panel');
-            
+
             panels.forEach(panel => {
+                 let leaveTimeout; // Timeout for resetting transition
+
                 panel.addEventListener('mousemove', (e) => {
+                    if (window.innerWidth < 768) return; // Disable on mobile
+                     clearTimeout(leaveTimeout); // Clear reset timeout if mouse re-enters
+
                     const rect = panel.getBoundingClientRect();
                     const x = e.clientX - rect.left;
                     const y = e.clientY - rect.top;
-                    
+
                     const xPercent = x / rect.width - 0.5;
                     const yPercent = y / rect.height - 0.5;
-                    
-                    const maxTilt = 10; // Max tilt in degrees
-                    const tiltX = maxTilt * yPercent * -1; // Invert Y axis
+
+                    const maxTilt = 10; // Original Max tilt
+                    const tiltX = maxTilt * yPercent * -1;
                     const tiltY = maxTilt * xPercent;
-                    
+
+                    // Apply transform directly with a quick transition for entering
+                    panel.style.transition = 'transform 0.1s ease-out, box-shadow 0.3s'; // Include box-shadow transition
                     panel.style.transform = `perspective(1000px) rotateX(${tiltX}deg) rotateY(${tiltY}deg) scale3d(1.02, 1.02, 1.02)`;
-                    
-                    // Add shine effect
-                    const shine = panel.querySelector('.panel-shine') || document.createElement('div');
-                    if (!panel.querySelector('.panel-shine')) {
+                    panel.style.boxShadow = '0 5px 20px rgba(0, 243, 255, 0.4)'; // Add hover shadow from original CSS :hover
+
+                    // Add/Update shine effect dynamically
+                    let shine = panel.querySelector('.panel-shine');
+                    if (!shine) {
+                        shine = document.createElement('div');
                         shine.classList.add('panel-shine');
-                        shine.style.position = 'absolute';
-                        shine.style.top = '0';
-                        shine.style.left = '0';
-                        shine.style.width = '100%';
-                        shine.style.height = '100%';
-                        shine.style.borderRadius = '10px';
-                        shine.style.background = 'radial-gradient(circle at ' + x + 'px ' + y + 'px, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0) 80%)';
-                        shine.style.pointerEvents = 'none';
                         panel.appendChild(shine);
-                    } else {
-                        shine.style.background = 'radial-gradient(circle at ' + x + 'px ' + y + 'px, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0) 80%)';
                     }
+                    shine.style.background = `radial-gradient(circle at ${x}px ${y}px, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0) 80%)`;
+                    shine.style.opacity = '1'; // Make visible
                 });
-                
+
                 panel.addEventListener('mouseleave', () => {
+                     if (window.innerWidth < 768) return;
+
+                    // Reset transform with transition
+                    panel.style.transition = 'transform 0.5s cubic-bezier(0.23, 1, 0.32, 1), box-shadow 0.3s'; // Smoother reset transition
                     panel.style.transform = 'perspective(1000px) rotateX(0) rotateY(0) scale3d(1, 1, 1)';
-                    
-                    // Remove shine effect
+                    panel.style.boxShadow = '0 0 15px rgba(0, 243, 255, 0.2)'; // Reset shadow
+
+                    // Fade out and remove shine effect
                     const shine = panel.querySelector('.panel-shine');
                     if (shine) {
-                        shine.style.background = 'radial-gradient(circle at center, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0) 0%)';
+                         shine.style.opacity = '0';
+                         // Remove element after transition
+                         setTimeout(() => {
+                             if (panel.contains(shine) && shine.style.opacity === '0') {
+                                  panel.removeChild(shine);
+                             }
+                         }, 400); // Match CSS transition duration for opacity
                     }
+                    // Set timeout to restore original transition after reset animation completes
+                     leaveTimeout = setTimeout(() => {
+                         panel.style.transition = 'box-shadow 0.3s';
+                     }, 500);
                 });
             });
-        });
+
+
+             // Add hover effect for NEW search button
+             const searchButton = document.querySelector('.search-button');
+             if (searchButton) {
+                 searchButton.addEventListener('mouseenter', () => {
+                    gsap.to(searchButton, {
+                        boxShadow: '0 0 15px rgba(0, 153, 255, 0.5)',
+                        scale: 1.05,
+                        duration: 0.3
+                    });
+                    const searchIcon = searchButton.querySelector('.search-icon');
+                    if (searchIcon) {
+                        gsap.to(searchIcon, {
+                            fill: 'rgba(0, 153, 255, 0.9)', duration: 0.3
+                         });
+                    }
+                });
+                searchButton.addEventListener('mouseleave', () => {
+                    gsap.to(searchButton, {
+                        boxShadow: '0 0 0 rgba(0, 153, 255, 0)',
+                        scale: 1,
+                        duration: 0.3
+                    });
+                     const searchIcon = searchButton.querySelector('.search-icon');
+                     if (searchIcon) {
+                         gsap.to(searchIcon, {
+                             fill: 'rgba(224, 224, 255, 0.8)', duration: 0.3
+                         });
+                    }
+                });
+            }
+
+        }); // End DOMContentLoaded
     </script>
 </body>
-</html> 
+</html>
