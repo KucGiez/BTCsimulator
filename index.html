@@ -1308,681 +1308,694 @@
             });
         } // End initSearchFunctionality
 
-        // Helper function to fetch data with retry logic (Improved Version)
+        // Helper for setting loading state
+        function setLoadingState(elementId, isLoading, placeholder = null) {
+            const element = document.getElementById(elementId);
+            if (!element) return;
+            
+            if (isLoading) {
+                element.classList.add('loading');
+                if (placeholder) element.textContent = placeholder;
+            } else {
+                element.classList.remove('loading');
+            }
+        }
+
+        // New improved retry mechanism with exponential backoff
         async function fetchWithRetry(url, retries = 3, delay = 1000) {
-             let lastError;
-            for (let i = 0; i < retries; i++) {
+            let useBackup = false;
+            let lastError = null;
+            
+            for (let attempt = 0; attempt < retries; attempt++) {
                 try {
-                    const response = await fetch(url);
+                    // Apply CORS proxy to the URL
+                    const proxiedUrl = proxyUrl(url, useBackup);
+                    console.log(`Fetching data from ${proxiedUrl} (attempt ${attempt + 1}/${retries})`);
+                    
+                    const response = await fetch(proxiedUrl, {
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json'
+                        },
+                        cache: 'no-store' // Disable caching to avoid stale data
+                    });
+                    
                     if (!response.ok) {
                         throw new Error(`HTTP error! Status: ${response.status}`);
                     }
-                    const text = await response.text();
-                    if (!text) {
-                         console.warn(`Empty response received from ${url}`);
-                         return null;
-                    }
-                    return JSON.parse(text);
+                    
+                    const data = await response.json();
+                    console.log(`Successfully fetched data from ${url}`);
+                    return data;
                 } catch (error) {
-                    console.warn(`Attempt ${i + 1}/${retries} failed for ${url}: ${error.message}`);
                     lastError = error;
-                    if (i < retries - 1) {
-                        await new Promise(r => setTimeout(r, delay + Math.random() * 1000));
+                    console.warn(`Attempt ${attempt + 1}/${retries} failed for ${url}: ${error.message}`);
+                    
+                    if (attempt === 0 && !useBackup) {
+                        // Try backup proxy on first failure
+                        useBackup = true;
+                        // Retry immediately with backup
+                        attempt--;
+                    } else {
+                        // For other failures, wait with exponential backoff
+                        const waitTime = delay * Math.pow(2, attempt) * (0.5 + Math.random() * 0.5);
+                        await new Promise(resolve => setTimeout(resolve, waitTime));
                     }
                 }
             }
+            
             console.error(`Failed to fetch ${url} after ${retries} attempts.`);
             throw lastError || new Error(`Failed to fetch data from ${url}`);
         }
 
-        // Bitcoin Data API Integrations (Adapted for Original HTML Structure)
-        function initBitcoinData() {
-            const COINGECKO_API_BASE = 'https://api.coingecko.com/api/v3';
-            const MEMPOOL_API_BASE = 'https://mempool.space/api/v1';
-            const BLOCKCHAIN_INFO_API = 'https://blockchain.info/q';
-            const CRYPTO_NEWS_API = 'https://min-api.cryptocompare.com/data/v2/news/?lang=EN&categories=BTC&limit=5';
-            const CRYPTOCOMPARE_API_BASE = 'https://min-api.cryptocompare.com/data'; // Added for price/chart
-
-            let priceDataSource = 'coingecko'; // Default data source
-            let currentPriceChartPeriod = '24h'; // Track current chart period
-            let currentBtcPriceData = null; // Store last successful price data
-
-            // --- Helper function to set loading state ---
-            function setLoadingState(elementId, isLoading, message = 'Loading...') {
-                 const element = document.getElementById(elementId);
-                 if (!element) return;
-                 if (isLoading) {
-                     // For simple text elements
-                     if (['btc-price', 'btc-change', 'market-cap', 'volume', 'circ-supply', 'fee-low', 'fee-high', 'fee-low-usd', 'fee-high-usd', 'hash-rate', 'difficulty', 'block-height', 'next-halving'].includes(elementId)) {
-                         element.textContent = message;
-                     }
-                     // For chart containers
-                     if (elementId === 'price-chart-container') {
-                          if (window.priceChart) window.priceChart.destroy();
-                          window.priceChart = null; // Ensure chart reference is cleared
-                          element.innerHTML = `<canvas id="price-chart"></canvas><div class="loading"></div>`; // Add canvas back
-                     }
-                 } else {
-                     // Clear loading for charts (actual data will fill it)
-                     if (elementId === 'price-chart-container') {
-                          const loadingDiv = element.querySelector('.loading');
-                          if (loadingDiv) element.removeChild(loadingDiv);
-                     }
-                     // We don't need to clear text elements here, fetch functions will update them
-                 }
-            }
-
-            // --- Get Bitcoin price and market data (Handles Source Switching) ---
-            async function fetchBitcoinPriceAndMarket() {
-                setLoadingState('btc-price', true);
-                setLoadingState('btc-change', true, ''); // Clear change initially
-                setLoadingState('market-cap', true);
-                setLoadingState('volume', true);
-                setLoadingState('circ-supply', true);
-                 currentBtcPriceData = null; // Clear previous data
-
-                 try {
-                     let priceData, marketData;
-
-                     if (priceDataSource === 'coingecko') {
-                         // CoinGecko provides price and market data in one call
-                         priceData = await fetchWithRetry(`${COINGECKO_API_BASE}/coins/bitcoin?localization=false&tickers=false&community_data=false&developer_data=false&sparkline=false`);
-                         marketData = priceData?.market_data;
-                     } else { // cryptocompare
-                         // CryptoCompare needs separate calls
-                         priceData = await fetchWithRetry(`${CRYPTOCOMPARE_API_BASE}/price?fsym=BTC&tsyms=USD`);
-                         // Fetch full data for market cap, volume etc. (less direct than CoinGecko)
-                         const fullData = await fetchWithRetry(`${CRYPTOCOMPARE_API_BASE}/pricemultifull?fsyms=BTC&tsyms=USD`);
-                         if (fullData?.RAW?.BTC?.USD) {
-                           marketData = fullData.RAW.BTC.USD; // Structure is different
-                         } else {
-                            console.warn("Could not retrieve full market data from CryptoCompare.");
-                            marketData = {}; // Assign empty object to avoid errors later
-                         }
-                     }
-
-                     const priceElement = document.getElementById('btc-price');
-                     const changeElement = document.getElementById('btc-change');
-                     const priceUpdateTime = document.getElementById('price-update-time');
-                     const marketUpdateTime = document.getElementById('market-update-time');
-
-                     // Store the successfully fetched data
-                     currentBtcPriceData = { priceData, marketData };
-
-                     if (priceDataSource === 'coingecko' && marketData) {
-                         const price = marketData.current_price?.usd;
-                         priceElement.textContent = price !== undefined ? `$${formatNumber(price)}` : '--';
-
-                         // Get appropriate price change based on currentPriceChartPeriod
-                         let priceChange = marketData.price_change_percentage_24h; // Default to 24h
-                         switch (currentPriceChartPeriod) {
-                             case '7d': priceChange = marketData.price_change_percentage_7d_in_currency?.usd ?? priceChange; break;
-                             case '30d': priceChange = marketData.price_change_percentage_30d_in_currency?.usd ?? priceChange; break;
-                             case '1y': priceChange = marketData.price_change_percentage_1y_in_currency?.usd ?? priceChange; break;
-                             // Note: CoinGecko API doesn't directly provide 3m change in this endpoint. Fallback to 24h.
-                         }
-
-                         if (priceChange !== undefined) {
-                            changeElement.textContent = `${priceChange >= 0 ? '+' : ''}${priceChange.toFixed(2)}%`;
-                            changeElement.className = `price-change ${priceChange >= 0 ? 'positive' : 'negative'}`;
-                         } else {
-                             changeElement.textContent = '--';
-                             changeElement.className = 'price-change';
-                         }
-
-                         document.getElementById('market-cap').textContent = marketData.market_cap?.usd ? `$${formatNumber(marketData.market_cap.usd)}` : '--';
-                         document.getElementById('volume').textContent = marketData.total_volume?.usd ? `$${formatNumber(marketData.total_volume.usd)}` : '--';
-                         document.getElementById('circ-supply').textContent = marketData.circulating_supply ? `${formatNumber(marketData.circulating_supply)} BTC` : '--';
-
-                     } else if (priceDataSource === 'cryptocompare' && priceData && marketData) {
-                         const price = priceData.USD;
-                         const priceChange24h = marketData.CHANGEPCT24HOUR;
-
-                         priceElement.textContent = price !== undefined ? `$${formatNumber(price)}` : '--';
-                         if (priceChange24h !== undefined) {
-                             changeElement.textContent = `${priceChange24h >= 0 ? '+' : ''}${priceChange24h.toFixed(2)}%`;
-                             changeElement.className = `price-change ${priceChange24h >= 0 ? 'positive' : 'negative'}`;
-                         } else {
-                             changeElement.textContent = '--';
-                             changeElement.className = 'price-change';
-                         }
-
-                         document.getElementById('market-cap').textContent = marketData.MKTCAP ? `$${formatNumber(marketData.MKTCAP)}` : '--';
-                         document.getElementById('volume').textContent = marketData.VOLUME24HOURTO ? `$${formatNumber(marketData.VOLUME24HOURTO)}` : '--';
-                         document.getElementById('circ-supply').textContent = marketData.SUPPLY ? `${formatNumber(marketData.SUPPLY)} BTC` : '--';
-
-                     } else {
-                         throw new Error('Price/Market data not found in response from selected source');
-                     }
-
-                     document.getElementById('max-supply').textContent = '21,000,000 BTC';
-                     const now = new Date();
-                     const updateTimeText = `Last updated: ${formatDateTime(now)} (${priceDataSource === 'coingecko' ? 'CG' : 'CC'})`;
-                     priceUpdateTime.textContent = updateTimeText;
-                     marketUpdateTime.textContent = updateTimeText;
-
-                     // Always try to create/update the chart after fetching price data
-                     createPriceChart(currentPriceChartPeriod);
-                     // window.lastPriceDataSource = priceDataSource; // No longer needed here
-
-                 } catch (error) {
-                     console.error(`Error fetching Bitcoin price/market data from ${priceDataSource}:`, error);
-                     document.getElementById('btc-price').textContent = 'Unavailable';
-                     document.getElementById('btc-change').textContent = '';
-                     document.getElementById('market-cap').textContent = '--';
-                     document.getElementById('volume').textContent = '--';
-                     document.getElementById('circ-supply').textContent = '--';
-                     const now = new Date();
-                     const errorMsg = `Error (${priceDataSource === 'coingecko' ? 'CG' : 'CC'}): ${formatDateTime(now)} - Retrying`;
-                     document.getElementById('price-update-time').textContent = errorMsg;
-                     document.getElementById('market-update-time').textContent = errorMsg;
-                     // Also clear chart on fetch error
-                     const chartContainer = document.getElementById('price-chart').parentNode;
-                      if (window.priceChart) window.priceChart.destroy();
-                      window.priceChart = null;
-                      chartContainer.innerHTML = `<canvas id="price-chart"></canvas><div style="position: absolute; top:0; left:0; right:0; bottom:0; display: flex; justify-content: center; align-items: center; height: 100%; color: rgba(224, 224, 255, 0.7); font-size: 0.9rem; text-align: center; padding: 10px;">Price data fetch failed<br>(${priceDataSource === 'coingecko' ? 'CG' : 'CC'}) - Retrying</div>`;
-                     setTimeout(fetchBitcoinPriceAndMarket, 30000);
-                 }
-            }
-
-            // --- Create interactive price chart (Handles Source Switching) ---
-            async function createPriceChart(period = '24h') {
-                // Ensure period matches the globally tracked one
-                period = currentPriceChartPeriod;
-
-                const chartContainer = document.getElementById('price-chart').parentNode; // Get chart-container div
-                 // Check if canvas exists, if not, recreate structure
-                 let canvasElement = document.getElementById('price-chart');
-                 if (!canvasElement) {
-                      chartContainer.innerHTML = '<canvas id="price-chart"></canvas>';
-                      canvasElement = document.getElementById('price-chart');
-                 }
-                 setLoadingState('price-chart-container', true);
-
-                try {
-                    document.querySelectorAll('#price-time-filter button').forEach(btn => btn.classList.remove('active'));
-                    const activeButton = document.querySelector(`#price-time-filter button[data-period="${period}"]`);
-                    if (activeButton) activeButton.classList.add('active');
-
-                    let apiUrl;
-                    let dataProcessor;
-
-                    if (priceDataSource === 'coingecko') {
-                         let days;
-                         switch (period) {
-                            case '24h': days = 1; break;
-                             case '7d': days = 7; break;
-                             case '30d': days = 30; break;
-                             case '3m': days = 90; break;
-                             case '1y': days = 365; break;
-                             default: days = 1;
-                         }
-                         apiUrl = `${COINGECKO_API_BASE}/coins/bitcoin/market_chart?vs_currency=usd&days=${days}`;
-                         dataProcessor = (data) => {
-                             if (!data || !data.prices) throw new Error('Invalid CoinGecko data');
-                             return data.prices.map(price => ({ t: price[0], y: price[1] })); // Format for Chart.js {t, y}
-                         };
-                    } else { // cryptocompare
-                         let endpoint, limit, aggregate;
-                         switch (period) {
-                            case '24h': endpoint = 'histohour'; limit = 24; aggregate = 1; break;
-                             case '7d': endpoint = 'histoday'; limit = 7; aggregate = 1; break;
-                             case '30d': endpoint = 'histoday'; limit = 30; aggregate = 1; break;
-                             case '3m': endpoint = 'histoday'; limit = 90; aggregate = 1; break;
-                             case '1y': endpoint = 'histoday'; limit = 365; aggregate = 1; break;
-                             default: endpoint = 'histohour'; limit = 24; aggregate = 1;
-                         }
-                         // Note: CryptoCompare free tier might limit historical data points
-                         apiUrl = `${CRYPTOCOMPARE_API_BASE}/${endpoint}?fsym=BTC&tsym=USD&limit=${limit}&aggregate=${aggregate}`;
-                         dataProcessor = (data) => {
-                             // Updated CryptoCompare processing based on observed structure
-                             // Check specifically for the nested Data array which holds the points
-                             if (!data || data.Response !== "Success" || !Array.isArray(data.Data?.Data) || data.Data.Data.length === 0) {
-                                 console.error("Invalid or empty CryptoCompare data structure received:", data);
-                                 throw new Error(`Invalid or empty CryptoCompare data structure: ${JSON.stringify(data || 'null').substring(0, 100)}`);
-                             }
-                             // Ensure 'time' and 'close' properties exist in the first point as a sanity check
-                             if (data.Data.Data[0]?.time === undefined || data.Data.Data[0]?.close === undefined) {
-                               console.error("CryptoCompare data points missing expected keys ('time', 'close'):", data.Data.Data[0]);
-                               throw new Error('CryptoCompare data points missing expected keys');
-                             }
-                             return data.Data.Data.map(item => ({ t: item.time * 1000, y: item.close })); // Use closing price
-                         };
+        // --- Fetch Bitcoin price from API ---
+        async function fetchBitcoinPrice() {
+            try {
+                // Try CoinGecko API first
+                const data = await fetchWithRetry(`${COINGECKO_API_BASE}/simple/price?ids=bitcoin&vs_currencies=usd&include_market_cap=true&include_24hr_vol=true&include_24hr_change=true&include_last_updated_at=true&precision=2`);
+                
+                if (data && data.bitcoin) {
+                    const btcData = data.bitcoin;
+                    currentBtcPriceData = btcData;
+                    
+                    document.getElementById('btc-price').textContent = `$${btcData.usd.toLocaleString('en-US')}`;
+                    
+                    const changePercent = btcData.usd_24h_change || 0;
+                    const changePercentElement = document.getElementById('btc-change-percent');
+                    
+                    // Format with 2 decimal places and add + sign for positive values
+                    const formattedChange = (changePercent >= 0 ? '+' : '') + changePercent.toFixed(2) + '%';
+                    changePercentElement.textContent = formattedChange;
+                    
+                    // Set color based on change direction
+                    if (changePercent > 0) {
+                        changePercentElement.classList.add('positive');
+                        changePercentElement.classList.remove('negative');
+                    } else if (changePercent < 0) {
+                        changePercentElement.classList.add('negative');
+                        changePercentElement.classList.remove('positive');
+                    } else {
+                        changePercentElement.classList.remove('positive', 'negative');
                     }
-
-                    const rawData = await fetchWithRetry(apiUrl);
-                    const chartPoints = dataProcessor(rawData);
-
-                    // Clear loading state before drawing chart
-                    setLoadingState('price-chart-container', false);
-
-                    const ctx = document.getElementById('price-chart').getContext('2d');
-                    if (window.priceChart) window.priceChart.destroy();
-                    window.priceChart = null; // Clear ref before creating new one
-
-                    const gradient = ctx.createLinearGradient(0, 0, 0, 200);
-                    gradient.addColorStop(0, 'rgba(0, 243, 255, 0.5)');
-                    gradient.addColorStop(1, 'rgba(0, 243, 255, 0)');
-
-                    window.priceChart = new Chart(ctx, {
-                        type: 'line',
-                        data: {
-                            datasets: [{
-                                label: 'Price (USD)',
-                                data: chartPoints, // Use processed {t, y} points
-                                borderColor: '#00f3ff',
-                                borderWidth: 2,
-                                backgroundColor: gradient,
-                                pointRadius: 0,
-                                tension: 0.4,
-                                fill: true
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: { display: false },
-                                tooltip: {
-                                    mode: 'index',
-                                    intersect: false,
-                                    backgroundColor: 'rgba(16, 23, 41, 0.9)',
-                                    titleColor: '#00f3ff',
-                                    bodyColor: '#e0e0ff',
-                                    borderColor: 'rgba(0, 243, 255, 0.3)',
-                                    borderWidth: 1,
-                                    padding: 10,
-                                    displayColors: false,
-                                    callbacks: {
-                                        label: function(context) {
-                                            return `$${formatNumber(context.raw.y)}`; // Access y value
-                                        }
-                                    }
-                                }
-                            },
-                            scales: {
-                                x: {
-                                    type: 'time', // Use time scale
-                                    grid: { display: false, drawBorder: false },
-                                    time: {
-                                        unit: period === '24h' ? 'hour' : 'day', // Adjust unit based on period
-                                        tooltipFormat: 'MMM d, yyyy HH:mm', // More detailed tooltip
-                                        displayFormats: {
-                                            hour: 'HH:mm', // Format for 24h
-                                            day: 'MMM d'   // Format for longer periods
-                                        }
-                                    },
-                                    ticks: {
-                                        color: 'rgba(224, 224, 255, 0.5)',
-                                        font: { size: 10 },
-                                        maxRotation: 0,
-                                        autoSkip: true,
-                                        maxTicksLimit: 8
-                                    }
-                                },
-                                y: {
-                                    grid: { color: 'rgba(224, 224, 255, 0.05)', drawBorder: false },
-                                    ticks: {
-                                        color: 'rgba(224, 224, 255, 0.5)',
-                                        font: { size: 10 },
-                                        callback: function(value) {
-                                            return '$' + value.toLocaleString();
-                                        }
-                                    }
-                                }
-                            },
-                            interaction: { mode: 'nearest', axis: 'x', intersect: false }, // Optimize interaction
-                            animation: { duration: 800, easing: 'easeOutQuart' } // Faster animation
-                        }
-                    });
-                } catch (error) {
-                    console.error(`Error creating price chart from ${priceDataSource} for ${period}:`, error);
-                    setLoadingState('price-chart-container', false); // Clear loading on error
-                     const chartContainer = document.getElementById('price-chart').parentNode;
-                      if (window.priceChart) window.priceChart.destroy();
-                      window.priceChart = null;
-                     chartContainer.innerHTML = `<canvas id="price-chart"></canvas><div style="position: absolute; top:0; left:0; right:0; bottom:0; display: flex; justify-content: center; align-items: center; height: 100%; color: rgba(224, 224, 255, 0.7); font-size: 0.9rem; text-align: center; padding: 10px;">Chart data unavailable<br>(${priceDataSource === 'coingecko' ? 'CG' : 'CC'}) - Retrying</div>`;
-                     // Attempt to reload chart data after a delay
-                     setTimeout(() => createPriceChart(currentPriceChartPeriod), 30000);
-                 }
-            }
-
-            // Fetch mempool and transaction fee data (Adapted for Original HTML)
-            async function fetchMempoolData() {
-                 setLoadingState('fee-low', true, '--');
-                 setLoadingState('fee-high', true, '--');
-                 setLoadingState('fee-low-usd', true, '$--');
-                 setLoadingState('fee-high-usd', true, '$--');
+                    
+                    document.getElementById('btc-market-cap').textContent = `$${Math.round(btcData.usd_market_cap / 1e9).toLocaleString('en-US')}B`;
+                    document.getElementById('btc-volume').textContent = `$${Math.round(btcData.usd_24h_vol / 1e9).toLocaleString('en-US')}B`;
+                    
+                    const lastUpdated = new Date(btcData.last_updated_at * 1000);
+                    document.getElementById('price-last-updated').textContent = `Last updated: ${lastUpdated.toLocaleTimeString()}`;
+                    
+                    return btcData;
+                } else {
+                    throw new Error('Invalid or empty Bitcoin data structure received from CoinGecko');
+                }
+            } catch (error) {
+                console.error('Error fetching Bitcoin price:', error);
+                
+                // Try CryptoCompare as fallback
                 try {
-                    const data = await fetchWithRetry(`${MEMPOOL_API_BASE}/fees/recommended`);
-
-                    if (data) {
-                        const lowFee = data.hourFee;
-                        const highFee = data.fastestFee;
-
-                        document.getElementById('fee-low').textContent = `${lowFee} sat/vB`;
-                        document.getElementById('fee-high').textContent = `${highFee} sat/vB`;
-
-                        let btcPriceUsd = 0;
-                        try {
-                            // Use the current price source for conversion
-                             if (priceDataSource === 'coingecko' && currentBtcPriceData && currentBtcPriceData.marketData) {
-                                 btcPriceUsd = currentBtcPriceData.marketData.current_price?.usd;
-                             } else if (priceDataSource === 'cryptocompare' && currentBtcPriceData && currentBtcPriceData.priceData) {
-                                 btcPriceUsd = currentBtcPriceData.priceData.USD;
-                             }
-                        } catch (e) { console.warn('Could not fetch BTC price for fee conversion:', e); }
-
-                        if (btcPriceUsd > 0) {
-                            const txSize = 250;
-                            const satsToBtc = 1e-8;
-                            document.getElementById('fee-low-usd').textContent = `$${(lowFee * txSize * satsToBtc * btcPriceUsd).toFixed(2)}`;
-                            document.getElementById('fee-high-usd').textContent = `$${(highFee * txSize * satsToBtc * btcPriceUsd).toFixed(2)}`;
+                    const ccData = await fetchWithRetry(`${CRYPTOCOMPARE_API_BASE}/price?fsym=BTC&tsyms=USD&extraParams=BitcoinDashboardNeo`);
+                    const ccFullData = await fetchWithRetry(`${CRYPTOCOMPARE_API_BASE}/pricemultifull?fsyms=BTC&tsyms=USD&extraParams=BitcoinDashboardNeo`);
+                    
+                    if (ccData && ccData.USD && ccFullData && ccFullData.RAW && ccFullData.RAW.BTC && ccFullData.RAW.BTC.USD) {
+                        const btcPrice = ccData.USD;
+                        const btcFullData = ccFullData.RAW.BTC.USD;
+                        
+                        document.getElementById('btc-price').textContent = `$${btcPrice.toLocaleString('en-US')}`;
+                        
+                        const changePercent = btcFullData.CHANGEPCT24HOUR || 0;
+                        const changePercentElement = document.getElementById('btc-change-percent');
+                        
+                        // Format with 2 decimal places and add + sign for positive values
+                        const formattedChange = (changePercent >= 0 ? '+' : '') + changePercent.toFixed(2) + '%';
+                        changePercentElement.textContent = formattedChange;
+                        
+                        // Set color based on change direction
+                        if (changePercent > 0) {
+                            changePercentElement.classList.add('positive');
+                            changePercentElement.classList.remove('negative');
+                        } else if (changePercent < 0) {
+                            changePercentElement.classList.add('negative');
+                            changePercentElement.classList.remove('positive');
                         } else {
-                            document.getElementById('fee-low-usd').textContent = '$--';
-                            document.getElementById('fee-high-usd').textContent = '$--';
+                            changePercentElement.classList.remove('positive', 'negative');
                         }
-                        document.getElementById('mempool-update-time').textContent = `Last updated: ${formatDateTime(new Date())}`;
+                        
+                        document.getElementById('btc-market-cap').textContent = `$${Math.round(btcFullData.MKTCAP / 1e9).toLocaleString('en-US')}B`;
+                        document.getElementById('btc-volume').textContent = `$${Math.round(btcFullData.VOLUME24HOUR / 1e9).toLocaleString('en-US')}B`;
+                        
+                        const lastUpdated = new Date(btcFullData.LASTUPDATE * 1000);
+                        document.getElementById('price-last-updated').textContent = `Last updated: ${lastUpdated.toLocaleTimeString()} (CC)`;
+                        
+                        // Construct a compatible data structure for the rest of the app
+                        currentBtcPriceData = {
+                            usd: btcPrice,
+                            usd_24h_change: changePercent,
+                            usd_market_cap: btcFullData.MKTCAP,
+                            usd_24h_vol: btcFullData.VOLUME24HOUR,
+                            last_updated_at: btcFullData.LASTUPDATE
+                        };
+                        
+                        return currentBtcPriceData;
                     } else {
-                         throw new Error("Missing mempool fee data");
+                        throw new Error('Invalid or empty CryptoCompare data structure received');
+                    }
+                } catch (fallbackError) {
+                    console.error('Fallback to CryptoCompare also failed:', fallbackError);
+                    document.getElementById('btc-price').textContent = 'Unavailable';
+                    document.getElementById('btc-change-percent').textContent = '';
+                    document.getElementById('btc-market-cap').textContent = 'Unavailable';
+                    document.getElementById('btc-volume').textContent = 'Unavailable';
+                    document.getElementById('price-last-updated').textContent = 'Data unavailable - Retrying in 30s';
+                    
+                    // Try again after 30 seconds
+                    setTimeout(fetchBitcoinPrice, 30000);
+                    return null;
+                }
+            }
+        }
+
+        // Create price chart
+        async function createPriceChart(period = '24h') {
+            try {
+                const periodMap = {
+                    '24h': 1,
+                    '7d': 7,
+                    '30d': 30,
+                    '90d': 90,
+                    '1y': 365
+                };
+                
+                const days = periodMap[period] || 1;
+                let chartData;
+                
+                try {
+                    // Try CoinGecko first
+                    const data = await fetchWithRetry(`${COINGECKO_API_BASE}/coins/bitcoin/market_chart?vs_currency=usd&days=${days}`);
+                    if (data && data.prices && data.prices.length > 0) {
+                        chartData = data.prices.map(price => ({
+                            time: new Date(price[0]).toISOString(),
+                            value: price[1]
+                        }));
+                    } else {
+                        throw new Error('Invalid or empty CoinGecko chart data');
                     }
                 } catch (error) {
-                    console.error('Error fetching mempool data:', error);
-                     document.getElementById('fee-low').textContent = '--';
-                     document.getElementById('fee-high').textContent = '--';
-                     document.getElementById('fee-low-usd').textContent = '$--';
-                     document.getElementById('fee-high-usd').textContent = '$--';
-                     const now = new Date();
-                     document.getElementById('mempool-update-time').textContent = `Error: ${formatDateTime(now)} - Retrying`;
-                     setTimeout(fetchMempoolData, 30000);
-                 }
-            }
-
-             // Fetch network statistics (Adapted for Original HTML)
-            async function fetchNetworkStats() {
-                 setLoadingState('hash-rate', true, '-- EH/s');
-                 setLoadingState('difficulty', true, '--');
-                 setLoadingState('block-height', true, '--');
-                 setLoadingState('next-halving', true, '--');
-                 try {
-                     let hashRate = 0, difficulty = 0, blockHeight = 0;
-                     const [hashRateRes, difficultyRes, blockHeightRes] = await Promise.allSettled([
-                         fetchWithRetry(`${BLOCKCHAIN_INFO_API}/hashrate`), // TH/s
-                         fetchWithRetry(`${BLOCKCHAIN_INFO_API}/getdifficulty`),
-                         fetchWithRetry(`${BLOCKCHAIN_INFO_API}/getblockcount`)
-                     ]);
-
-                     if (hashRateRes.status === 'fulfilled') {
-                         hashRate = hashRateRes.value / 1e6; // TH/s to EH/s
-                     } else {
-                         console.warn("Primary hash rate fetch failed, using estimate.");
-                         hashRate = 120; // Fallback estimate
-                     }
-
-                     if (difficultyRes.status === 'fulfilled') difficulty = difficultyRes.value;
-                     if (blockHeightRes.status === 'fulfilled') blockHeight = blockHeightRes.value;
-
-                     const hashRateElement = document.getElementById('hash-rate');
-                     if (hashRate > 0.01 && !isNaN(hashRate)) {
-                         hashRateElement.textContent = `${hashRate.toFixed(2)} EH/s`;
-                     } else {
-                         console.warn("Hash rate invalid, using estimate.");
-                         hashRateElement.textContent = `~120.00 EH/s (est.)`;
-                     }
-
-                     document.getElementById('difficulty').textContent = formatNumber(difficulty) || '--';
-                     document.getElementById('block-height').textContent = formatNumber(blockHeight) || '--';
-
-                    if (blockHeight > 0) {
-                         const currentBlock = blockHeight;
-                         const blocksPerHalving = 210000;
-                         const nextHalvingBlock = Math.ceil(currentBlock / blocksPerHalving) * blocksPerHalving;
-                         const blocksUntilHalving = nextHalvingBlock - currentBlock;
-                         const daysUntilHalving = Math.floor(blocksUntilHalving / 144);
-                         document.getElementById('next-halving').textContent = `${formatNumber(blocksUntilHalving)} blocks (~${daysUntilHalving} days)`;
-                     } else {
-                         document.getElementById('next-halving').textContent = '--';
-                     }
-                     document.getElementById('network-update-time').textContent = `Last updated: ${formatDateTime(new Date())}`;
-                 } catch (error) {
-                     console.error('Error fetching network stats:', error);
-                     document.getElementById('hash-rate').textContent = 'Unavailable';
-                     document.getElementById('difficulty').textContent = 'Unavailable';
-                     document.getElementById('block-height').textContent = 'Unavailable';
-                     document.getElementById('next-halving').textContent = 'Unavailable';
-                     const now = new Date();
-                     document.getElementById('network-update-time').textContent = `Error: ${formatDateTime(now)} - Retrying`;
-                     setTimeout(fetchNetworkStats, 60000);
-                 }
-            }
-
-             // Fetch latest transactions (Using newer Mempool.space API for reliability)
-             async function fetchLatestTransactions() {
-                const transactionsContainer = document.getElementById('latest-transactions');
-                 // Simplified loading state for list container
-                 transactionsContainer.innerHTML = '<div class="loading"></div>';
-                 try {
-                    const data = await fetchWithRetry(`${MEMPOOL_API_BASE}/mempool/recent`);
-
-                     if (data && Array.isArray(data)) {
-                         transactionsContainer.innerHTML = ''; // Clear loading
-                         const transactionsList = document.createElement('div');
-                         transactionsList.className = 'transactions-list';
-                         const transactions = data.slice(0, 5);
-
-                         if(transactions.length === 0) {
-                              transactionsContainer.innerHTML = '<div style="text-align: center; color: rgba(224, 224, 255, 0.7); padding: 20px;">No recent transactions in mempool.</div>';
-                         } else {
-                             transactions.forEach(tx => {
-                                 const txItem = document.createElement('div');
-                                 txItem.className = 'transaction-item';
-                                 const shortTxid = `${tx.txid.substring(0, 8)}...${tx.txid.substring(tx.txid.length - 8)}`;
-                                 const btcValue = (tx.value / 1e8).toFixed(4);
-                                 const feeBTC = (tx.fee / 1e8).toFixed(8);
-
-                                 txItem.innerHTML = `
-                                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-                                         <div style="font-size: 0.9rem; color: var(--neon-blue); word-break: break-all; margin-right: 10px;">${shortTxid}</div>
-                                         <div style="font-size: 0.9rem; font-weight: 600; white-space: nowrap;">${btcValue} BTC</div>
-                                     </div>
-                                     <div style="display: flex; justify-content: flex-start; font-size: 0.8rem; color: rgba(224, 224, 255, 0.7);">
-                                         <div>Fee: ${feeBTC} BTC</div>
-                                     </div>
-                                 `;
-                                 transactionsList.appendChild(txItem);
-                             });
-                              transactionsContainer.appendChild(transactionsList);
-                         }
-
-                         const updateTimeDiv = document.createElement('div');
-                         updateTimeDiv.className = 'update-time';
-                         updateTimeDiv.id = 'transactions-update-time';
-                         updateTimeDiv.textContent = `Last updated: ${formatDateTime(new Date())}`;
-                         transactionsContainer.appendChild(updateTimeDiv);
-
-                     } else {
-                          throw new Error("Invalid recent transaction data received");
-                     }
-                 } catch (error) {
-                     console.error('Error fetching latest transactions:', error);
-                     transactionsContainer.innerHTML = `
-                         <div style="text-align: center; color: rgba(224, 224, 255, 0.7); padding: 20px;">Unable to load transactions</div>
-                         <div class="update-time" id="transactions-update-time">Last updated: --</div>
-                     `;
-                     const now = new Date();
-                     const updateTimeElement = transactionsContainer.querySelector('#transactions-update-time');
-                     if (updateTimeElement) {
-                         updateTimeElement.textContent = `Error: ${formatDateTime(now)} - Retrying`;
-                     }
-                     setTimeout(fetchLatestTransactions, 30000);
-                 }
-            }
-
-            // Fetch Bitcoin news (Using newer API and structure)
-            async function fetchBitcoinNews() {
-                 const newsContainer = document.getElementById('bitcoin-news');
-                 newsContainer.innerHTML = '<div class="loading"></div>'; // Show loading
-                try {
-                    const data = await fetchWithRetry(CRYPTO_NEWS_API);
-
-                    if (data && data.Data && data.Data.length > 0) {
-                        newsContainer.innerHTML = '';
-                        const newsList = document.createElement('div');
-                        newsList.className = 'news-list';
-                        const newsItems = data.Data.slice(0, 5);
-
-                        newsItems.forEach(item => {
-                            const newsItem = document.createElement('div');
-                            newsItem.className = 'news-item';
-                            const pubDate = new Date(item.published_on * 1000);
-                            const timeAgo = getTimeAgo(pubDate);
-
-                            newsItem.innerHTML = `
-                                <div style="font-size: 0.9rem; font-weight: 500; margin-bottom: 5px;">${item.title}</div>
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                                    <div style="font-size: 0.75rem; color: rgba(224, 224, 255, 0.7);">${item.source}</div>
-                                    <div style="font-size: 0.75rem; color: rgba(224, 224, 255, 0.7);">${timeAgo}</div>
-                                </div>
-                                <a href="${item.url}" target="_blank">Read More</a>
-                            `;
-                            newsList.appendChild(newsItem);
-                        });
-                        newsContainer.appendChild(newsList);
-                        const updateTimeDiv = document.createElement('div');
-                        updateTimeDiv.className = 'update-time';
-                        updateTimeDiv.id = 'news-update-time';
-                        updateTimeDiv.textContent = `Last updated: ${formatDateTime(new Date())}`;
-                        newsContainer.appendChild(updateTimeDiv);
-                    } else {
-                         throw new Error("No news data received from API");
+                    console.warn('CoinGecko chart data failed, trying CryptoCompare:', error);
+                    
+                    // Use CryptoCompare as fallback
+                    // Determine appropriate granularity based on period
+                    let endpoint = 'histohour';
+                    let limit = 24;
+                    
+                    if (days >= 7) {
+                        endpoint = 'histoday';
+                        limit = days;
+                    } else if (days > 1) {
+                        limit = days * 24;
                     }
-                } catch (error) {
-                    console.error('Error fetching Bitcoin news:', error);
-                    newsContainer.innerHTML = `
-                        <div style="text-align: center; color: rgba(224, 224, 255, 0.7); padding: 20px;">Unable to load news</div>
-                        <div class="update-time" id="news-update-time">Last updated: --</div>
-                    `;
-                     const now = new Date();
-                     const updateTimeElement = newsContainer.querySelector('#news-update-time');
-                     if (updateTimeElement) {
-                         updateTimeElement.textContent = `Error: ${formatDateTime(now)} - Retrying`;
-                     }
-                     setTimeout(fetchBitcoinNews, 60000);
-                 }
-            }
-
-            // Utility function to format large numbers (Adapted from Original)
-            function formatNumber(num) {
-                if (num === undefined || num === null || isNaN(num)) return '--';
-                num = parseFloat(num);
-                 if (num >= 1e12) return (num / 1e12).toFixed(2) + ' T';
-                 if (num >= 1e9) return (num / 1e9).toFixed(2) + ' B';
-                 if (num >= 1e6) return (num / 1e6).toFixed(2) + ' M';
-                 if (num >= 1e3) return (num / 1e3).toFixed(2) + ' K';
-                return num.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: num < 1 ? 8 : 0 });
-            }
-
-            // Format date and time (Adapted from Original - shorter format)
-            function formatDateTime(date) {
-                 if (!date || !(date instanceof Date)) return '--';
-                try {
-                     return date.toLocaleString([], {
-                         month: 'short',
-                         day: 'numeric',
-                         hour: '2-digit',
-                         minute: '2-digit'
-                     });
-                 } catch (e) { console.error("Error formatting date:", e); return '--'; }
-            }
-
-            // Get time ago string (Adapted from Original)
-            function getTimeAgo(date) {
-                 if (!date || !(date instanceof Date)) return '--';
-                const now = new Date();
-                const diffMs = now - date;
-                const diffSec = Math.round(diffMs / 1000);
-                if (diffSec < 5) return 'just now';
-                if (diffSec < 60) return `${diffSec}s ago`;
-                if (diffSec < 3600) return `${Math.round(diffSec / 60)}m ago`;
-                if (diffSec < 86400) return `${Math.round(diffSec / 3600)}h ago`;
-                return `${Math.round(diffSec / 86400)}d ago`;
-            }
-
-            // --- Event Listener for Data Source Toggle ---
-            document.querySelectorAll('#price-data-source .source-button').forEach(button => {
-                 button.addEventListener('click', () => {
-                     const newSource = button.getAttribute('data-source');
-                     if (newSource !== priceDataSource) {
-                         // Update state
-                         priceDataSource = newSource;
-                         // Update button styles
-                         document.querySelectorAll('#price-data-source .source-button').forEach(btn => btn.classList.remove('active'));
-                         button.classList.add('active');
-                         // Fetch new data immediately
-                         fetchBitcoinPriceAndMarket(); // This will also trigger chart update
-                     }
-                 });
-             });
-
-            // Add event listeners for price chart time filters
-            document.querySelectorAll('#price-time-filter button').forEach(button => {
-                button.addEventListener('click', () => {
-                    const period = button.getAttribute('data-period');
-                    if (period !== currentPriceChartPeriod) {
-                        currentPriceChartPeriod = period; // Update global period
-                        // Fetch new price/market data, which will trigger chart update & update % change
-                        fetchBitcoinPriceAndMarket();
+                    
+                    const ccData = await fetchWithRetry(
+                        `${CRYPTOCOMPARE_API_BASE}/${endpoint}?fsym=BTC&tsym=USD&limit=${limit}&extraParams=BitcoinDashboardNeo`
+                    );
+                    
+                    if (ccData && ccData.Data && ccData.Data.length > 0) {
+                        chartData = ccData.Data.map(point => ({
+                            time: new Date(point.time * 1000).toISOString(),
+                            value: point.close
+                        }));
+                        
+                        // Update chart title with data source indicator
+                        document.getElementById('chart-source-indicator').textContent = '(CC)';
+                    } else {
+                        throw new Error('Both chart data sources failed');
+                    }
+                }
+                
+                // Clear existing chart
+                document.getElementById('price-chart').innerHTML = '';
+                document.getElementById('chart-error').style.display = 'none';
+                
+                // Create new chart
+                const chart = LightweightCharts.createChart(document.getElementById('price-chart'), {
+                    width: document.getElementById('price-chart').clientWidth,
+                    height: 300,
+                    layout: {
+                        backgroundColor: '#0f172a',
+                        textColor: '#d7dcec',
+                        fontSize: 12
+                    },
+                    grid: {
+                        vertLines: { color: 'rgba(42, 46, 57, 0.2)' },
+                        horzLines: { color: 'rgba(42, 46, 57, 0.2)' }
+                    },
+                    timeScale: {
+                        timeVisible: true,
+                        secondsVisible: false
+                    },
+                    rightPriceScale: {
+                        borderColor: 'rgba(197, 203, 206, 0.4)'
                     }
                 });
+                
+                const lineSeries = chart.addLineSeries({
+                    color: '#F7931A',
+                    lineWidth: 2,
+                    crosshairMarkerRadius: 4
+                });
+                
+                lineSeries.setData(chartData);
+                chart.timeScale().fitContent();
+                
+                // Update active button
+                document.querySelectorAll('.chart-period-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                document.getElementById(`chart-period-${period}`).classList.add('active');
+                
+                // Clear any chart errors
+                document.getElementById('chart-source-indicator').style.color = '';
+                document.getElementById('chart-error').style.display = 'none';
+                
+                return chart;
+            } catch (error) {
+                console.error('Error creating price chart:', error);
+                document.getElementById('price-chart').innerHTML = '';
+                document.getElementById('chart-error').style.display = 'block';
+                document.getElementById('chart-error').textContent = `Chart data unavailable - Retrying in 30s`;
+                document.getElementById('chart-source-indicator').style.color = '#ff6b6b';
+                
+                // Try again after 30 seconds
+                setTimeout(() => createPriceChart(period), 30000);
+                return null;
+            }
+        }
+
+        // Fetch mempool and transaction fee data (Adapted for Original HTML)
+        async function fetchMempoolData() {
+             setLoadingState('fee-low', true, '--');
+             setLoadingState('fee-high', true, '--');
+             setLoadingState('fee-low-usd', true, '$--');
+             setLoadingState('fee-high-usd', true, '$--');
+            try {
+                const data = await fetchWithRetry(`${MEMPOOL_API_BASE}/fees/recommended`);
+
+                if (data) {
+                    const lowFee = data.hourFee;
+                    const highFee = data.fastestFee;
+
+                    document.getElementById('fee-low').textContent = `${lowFee} sat/vB`;
+                    document.getElementById('fee-high').textContent = `${highFee} sat/vB`;
+
+                    let btcPriceUsd = 0;
+                    try {
+                        // Use the current price source for conversion
+                         if (priceDataSource === 'coingecko' && currentBtcPriceData && currentBtcPriceData.marketData) {
+                             btcPriceUsd = currentBtcPriceData.marketData.current_price?.usd;
+                         } else if (priceDataSource === 'cryptocompare' && currentBtcPriceData && currentBtcPriceData.priceData) {
+                             btcPriceUsd = currentBtcPriceData.priceData.USD;
+                         }
+                    } catch (e) { console.warn('Could not fetch BTC price for fee conversion:', e); }
+
+                    if (btcPriceUsd > 0) {
+                        const txSize = 250;
+                        const satsToBtc = 1e-8;
+                        document.getElementById('fee-low-usd').textContent = `$${(lowFee * txSize * satsToBtc * btcPriceUsd).toFixed(2)}`;
+                        document.getElementById('fee-high-usd').textContent = `$${(highFee * txSize * satsToBtc * btcPriceUsd).toFixed(2)}`;
+                    } else {
+                        document.getElementById('fee-low-usd').textContent = '$--';
+                        document.getElementById('fee-high-usd').textContent = '$--';
+                    }
+                    document.getElementById('mempool-update-time').textContent = `Last updated: ${formatDateTime(new Date())}`;
+                } else {
+                     throw new Error("Missing mempool fee data");
+                }
+            } catch (error) {
+                console.error('Error fetching mempool data:', error);
+                 document.getElementById('fee-low').textContent = '--';
+                 document.getElementById('fee-high').textContent = '--';
+                 document.getElementById('fee-low-usd').textContent = '$--';
+                 document.getElementById('fee-high-usd').textContent = '$--';
+                 const now = new Date();
+                 document.getElementById('mempool-update-time').textContent = `Error: ${formatDateTime(now)} - Retrying`;
+                 setTimeout(fetchMempoolData, 30000);
+             }
+        }
+
+         // Fetch network statistics (Adapted for Original HTML)
+        async function fetchNetworkStats() {
+             setLoadingState('hash-rate', true, '-- EH/s');
+             setLoadingState('difficulty', true, '--');
+             setLoadingState('block-height', true, '--');
+             setLoadingState('next-halving', true, '--');
+             try {
+                 let hashRate = 0, difficulty = 0, blockHeight = 0;
+                 const [hashRateRes, difficultyRes, blockHeightRes] = await Promise.allSettled([
+                     fetchWithRetry(`${BLOCKCHAIN_INFO_API}/hashrate`), // TH/s
+                     fetchWithRetry(`${BLOCKCHAIN_INFO_API}/getdifficulty`),
+                     fetchWithRetry(`${BLOCKCHAIN_INFO_API}/getblockcount`)
+                 ]);
+
+                 if (hashRateRes.status === 'fulfilled') {
+                     hashRate = hashRateRes.value / 1e6; // TH/s to EH/s
+                 } else {
+                     console.warn("Primary hash rate fetch failed, using estimate.");
+                     hashRate = 120; // Fallback estimate
+                 }
+
+                 if (difficultyRes.status === 'fulfilled') difficulty = difficultyRes.value;
+                 if (blockHeightRes.status === 'fulfilled') blockHeight = blockHeightRes.value;
+
+                 const hashRateElement = document.getElementById('hash-rate');
+                 if (hashRate > 0.01 && !isNaN(hashRate)) {
+                     hashRateElement.textContent = `${hashRate.toFixed(2)} EH/s`;
+                 } else {
+                     console.warn("Hash rate invalid, using estimate.");
+                     hashRateElement.textContent = `~120.00 EH/s (est.)`;
+                 }
+
+                 document.getElementById('difficulty').textContent = formatNumber(difficulty) || '--';
+                 document.getElementById('block-height').textContent = formatNumber(blockHeight) || '--';
+
+                if (blockHeight > 0) {
+                     const currentBlock = blockHeight;
+                     const blocksPerHalving = 210000;
+                     const nextHalvingBlock = Math.ceil(currentBlock / blocksPerHalving) * blocksPerHalving;
+                     const blocksUntilHalving = nextHalvingBlock - currentBlock;
+                     const daysUntilHalving = Math.floor(blocksUntilHalving / 144);
+                     document.getElementById('next-halving').textContent = `${formatNumber(blocksUntilHalving)} blocks (~${daysUntilHalving} days)`;
+                 } else {
+                     document.getElementById('next-halving').textContent = '--';
+                 }
+                 document.getElementById('network-update-time').textContent = `Last updated: ${formatDateTime(new Date())}`;
+             } catch (error) {
+                 console.error('Error fetching network stats:', error);
+                 document.getElementById('hash-rate').textContent = 'Unavailable';
+                 document.getElementById('difficulty').textContent = 'Unavailable';
+                 document.getElementById('block-height').textContent = 'Unavailable';
+                 document.getElementById('next-halving').textContent = 'Unavailable';
+                 const now = new Date();
+                 document.getElementById('network-update-time').textContent = `Error: ${formatDateTime(now)} - Retrying`;
+                 setTimeout(fetchNetworkStats, 60000);
+             }
+        }
+
+         // Fetch latest transactions (Using newer Mempool.space API for reliability)
+         async function fetchLatestTransactions() {
+            const transactionsContainer = document.getElementById('latest-transactions');
+             // Simplified loading state for list container
+             transactionsContainer.innerHTML = '<div class="loading"></div>';
+             try {
+                const data = await fetchWithRetry(`${MEMPOOL_API_BASE}/mempool/recent`);
+
+                 if (data && Array.isArray(data)) {
+                     transactionsContainer.innerHTML = ''; // Clear loading
+                     const transactionsList = document.createElement('div');
+                     transactionsList.className = 'transactions-list';
+                     const transactions = data.slice(0, 5);
+
+                     if(transactions.length === 0) {
+                          transactionsContainer.innerHTML = '<div style="text-align: center; color: rgba(224, 224, 255, 0.7); padding: 20px;">No recent transactions in mempool.</div>';
+                     } else {
+                         transactions.forEach(tx => {
+                             const txItem = document.createElement('div');
+                             txItem.className = 'transaction-item';
+                             const shortTxid = `${tx.txid.substring(0, 8)}...${tx.txid.substring(tx.txid.length - 8)}`;
+                             const btcValue = (tx.value / 1e8).toFixed(4);
+                             const feeBTC = (tx.fee / 1e8).toFixed(8);
+
+                             txItem.innerHTML = `
+                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                                     <div style="font-size: 0.9rem; color: var(--neon-blue); word-break: break-all; margin-right: 10px;">${shortTxid}</div>
+                                     <div style="font-size: 0.9rem; font-weight: 600; white-space: nowrap;">${btcValue} BTC</div>
+                                 </div>
+                                 <div style="display: flex; justify-content: flex-start; font-size: 0.8rem; color: rgba(224, 224, 255, 0.7);">
+                                     <div>Fee: ${feeBTC} BTC</div>
+                                 </div>
+                             `;
+                             transactionsList.appendChild(txItem);
+                         });
+                          transactionsContainer.appendChild(transactionsList);
+                     }
+
+                     const updateTimeDiv = document.createElement('div');
+                     updateTimeDiv.className = 'update-time';
+                     updateTimeDiv.id = 'transactions-update-time';
+                     updateTimeDiv.textContent = `Last updated: ${formatDateTime(new Date())}`;
+                     transactionsContainer.appendChild(updateTimeDiv);
+
+                 } else {
+                      throw new Error("Invalid recent transaction data received");
+                 }
+             } catch (error) {
+                 console.error('Error fetching latest transactions:', error);
+                 transactionsContainer.innerHTML = `
+                     <div style="text-align: center; color: rgba(224, 224, 255, 0.7); padding: 20px;">Unable to load transactions</div>
+                     <div class="update-time" id="transactions-update-time">Last updated: --</div>
+                 `;
+                 const now = new Date();
+                 const updateTimeElement = transactionsContainer.querySelector('#transactions-update-time');
+                 if (updateTimeElement) {
+                     updateTimeElement.textContent = `Error: ${formatDateTime(now)} - Retrying`;
+                 }
+                 setTimeout(fetchLatestTransactions, 30000);
+             }
+        }
+
+        // Fetch Bitcoin news (Using newer API and structure)
+        async function fetchBitcoinNews() {
+             const newsContainer = document.getElementById('bitcoin-news');
+             newsContainer.innerHTML = '<div class="loading"></div>'; // Show loading
+            try {
+                const data = await fetchWithRetry(CRYPTO_NEWS_API);
+
+                if (data && data.Data && data.Data.length > 0) {
+                    newsContainer.innerHTML = '';
+                    const newsList = document.createElement('div');
+                    newsList.className = 'news-list';
+                    const newsItems = data.Data.slice(0, 5);
+
+                    newsItems.forEach(item => {
+                        const newsItem = document.createElement('div');
+                        newsItem.className = 'news-item';
+                        const pubDate = new Date(item.published_on * 1000);
+                        const timeAgo = getTimeAgo(pubDate);
+
+                        newsItem.innerHTML = `
+                            <div style="font-size: 0.9rem; font-weight: 500; margin-bottom: 5px;">${item.title}</div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <div style="font-size: 0.75rem; color: rgba(224, 224, 255, 0.7);">${item.source}</div>
+                                <div style="font-size: 0.75rem; color: rgba(224, 224, 255, 0.7);">${timeAgo}</div>
+                            </div>
+                            <a href="${item.url}" target="_blank">Read More</a>
+                        `;
+                        newsList.appendChild(newsItem);
+                    });
+                    newsContainer.appendChild(newsList);
+                    const updateTimeDiv = document.createElement('div');
+                    updateTimeDiv.className = 'update-time';
+                    updateTimeDiv.id = 'news-update-time';
+                    updateTimeDiv.textContent = `Last updated: ${formatDateTime(new Date())}`;
+                    newsContainer.appendChild(updateTimeDiv);
+                } else {
+                     throw new Error("No news data received from API");
+                }
+            } catch (error) {
+                console.error('Error fetching Bitcoin news:', error);
+                newsContainer.innerHTML = `
+                    <div style="text-align: center; color: rgba(224, 224, 255, 0.7); padding: 20px;">Unable to load news</div>
+                    <div class="update-time" id="news-update-time">Last updated: --</div>
+                `;
+                 const now = new Date();
+                 const updateTimeElement = newsContainer.querySelector('#news-update-time');
+                 if (updateTimeElement) {
+                     updateTimeElement.textContent = `Error: ${formatDateTime(now)} - Retrying`;
+                 }
+                 setTimeout(fetchBitcoinNews, 60000);
+             }
+        }
+
+        // Utility function to format large numbers (Adapted from Original)
+        function formatNumber(num) {
+            if (num === undefined || num === null || isNaN(num)) return '--';
+            num = parseFloat(num);
+             if (num >= 1e12) return (num / 1e12).toFixed(2) + ' T';
+             if (num >= 1e9) return (num / 1e9).toFixed(2) + ' B';
+             if (num >= 1e6) return (num / 1e6).toFixed(2) + ' M';
+             if (num >= 1e3) return (num / 1e3).toFixed(2) + ' K';
+            return num.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: num < 1 ? 8 : 0 });
+        }
+
+        // Format date and time (Adapted from Original - shorter format)
+        function formatDateTime(date) {
+             if (!date || !(date instanceof Date)) return '--';
+            try {
+                 return date.toLocaleString([], {
+                     month: 'short',
+                     day: 'numeric',
+                     hour: '2-digit',
+                     minute: '2-digit'
+                 });
+             } catch (e) { console.error("Error formatting date:", e); return '--'; }
+        }
+
+        // Get time ago string (Adapted from Original)
+        function getTimeAgo(date) {
+             if (!date || !(date instanceof Date)) return '--';
+            const now = new Date();
+            const diffMs = now - date;
+            const diffSec = Math.round(diffMs / 1000);
+            if (diffSec < 5) return 'just now';
+            if (diffSec < 60) return `${diffSec}s ago`;
+            if (diffSec < 3600) return `${Math.round(diffSec / 60)}m ago`;
+            if (diffSec < 86400) return `${Math.round(diffSec / 3600)}h ago`;
+            return `${Math.round(diffSec / 86400)}d ago`;
+        }
+
+        // --- Event Listener for Data Source Toggle ---
+        document.querySelectorAll('#price-data-source .source-button').forEach(button => {
+             button.addEventListener('click', () => {
+                 const newSource = button.getAttribute('data-source');
+                 if (newSource !== priceDataSource) {
+                     // Update state
+                     priceDataSource = newSource;
+                     // Update button styles
+                     document.querySelectorAll('#price-data-source .source-button').forEach(btn => btn.classList.remove('active'));
+                     button.classList.add('active');
+                     // Fetch new data immediately
+                     fetchBitcoinPrice(); // This will also trigger chart update
+                 }
+             });
+         });
+
+        // Add event listeners for price chart time filters
+        document.querySelectorAll('#price-time-filter button').forEach(button => {
+            button.addEventListener('click', () => {
+                const period = button.getAttribute('data-period');
+                if (period !== currentPriceChartPeriod) {
+                    currentPriceChartPeriod = period; // Update global period
+                    // Fetch new price/market data, which will trigger chart update & update % change
+                    fetchBitcoinPrice();
+                }
             });
+        });
 
-            // Initialize all data fetches
-            fetchBitcoinPriceAndMarket();
-            fetchMempoolData();
-            fetchNetworkStats();
-            fetchLatestTransactions();
-            fetchBitcoinNews();
+        // Initialize all data fetches
+        fetchBitcoinPrice();
+        fetchMempoolData();
+        fetchNetworkStats();
+        fetchLatestTransactions();
+        fetchBitcoinNews();
 
-            // Set up auto-refresh intervals (Using newer intervals)
-            setInterval(fetchBitcoinPriceAndMarket, 60000);
-            setInterval(fetchMempoolData, 2 * 60000);
-            setInterval(fetchNetworkStats, 5 * 60000);
-            setInterval(fetchLatestTransactions, 30000);
-            setInterval(fetchBitcoinNews, 10 * 60000);
-        } // End initBitcoinData
+        // Set up auto-refresh intervals (Using newer intervals)
+        setInterval(fetchBitcoinPrice, 60000);
+        setInterval(fetchMempoolData, 2 * 60000);
+        setInterval(fetchNetworkStats, 5 * 60000);
+        setInterval(fetchLatestTransactions, 30000);
+        setInterval(fetchBitcoinNews, 10 * 60000);
 
+        // API Base URLs
+        const COINGECKO_API_BASE = 'https://api.coingecko.com/api/v3';
+        const MEMPOOL_API_BASE = 'https://mempool.space/api/v1';
+        const BLOCKCHAIN_INFO_API = 'https://blockchain.info/stats?format=json';
+        const CRYPTO_NEWS_API = 'https://min-api.cryptocompare.com/data/v2/news/?lang=EN&categories=BTC&limit=5';
+        const CRYPTOCOMPARE_API_BASE = 'https://min-api.cryptocompare.com/data';
+        
+        // CORS Proxy settings
+        const CORS_PROXY = 'https://corsproxy.io/?';
+        const CORS_PROXY_BACKUP = 'https://api.allorigins.win/raw?url=';
+        const USE_CORS_PROXY = true; // Enable/disable proxy usage
+        
+        // Global variables
+        let priceDataSource = 'cryptocompare'; // Default data source
+        let currentPriceChartPeriod = '24h';
+        let currentBtcPriceData = null;
+        
+        // Helper function to use CORS proxy
+        function proxyUrl(url, useBackup = false) {
+            if (!USE_CORS_PROXY) return url;
+            return useBackup ? CORS_PROXY_BACKUP + encodeURIComponent(url) : CORS_PROXY + encodeURIComponent(url);
+        }
+        
+        // Helper for setting loading state
+        function setLoadingState(selector, isLoading) {
+            const elements = document.querySelectorAll(selector);
+            elements.forEach(element => {
+                if (isLoading) {
+                    element.classList.add('loading');
+                } else {
+                    element.classList.remove('loading');
+                }
+            });
+        }
+
+        // Helper function for fetch with retries
+        async function fetchWithRetry(url, retries = 3, delay = 1000) {
+            // Use proxy for external API calls
+            const proxiedUrl = proxyUrl(url);
+            
+            for (let i = 0; i < retries; i++) {
+                try {
+                    const response = await fetch(proxiedUrl);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! Status: ${response.status}`);
+                    }
+                    return await response.json();
+                } catch (error) {
+                    console.warn(`Attempt ${i + 1}/${retries} failed for ${url}: ${error.message}`);
+                    if (i === retries - 1) { // Last attempt
+                        // Try the backup proxy on the last attempt
+                        if (!url.includes(CORS_PROXY) && !url.includes(CORS_PROXY_BACKUP)) {
+                            try {
+                                console.log("Trying backup CORS proxy...");
+                                const backupResponse = await fetch(proxyUrl(url, true));
+                                if (backupResponse.ok) {
+                                    return await backupResponse.json();
+                                }
+                            } catch (backupError) {
+                                console.error("Backup proxy also failed:", backupError);
+                            }
+                        }
+                        throw error;
+                    }
+                    // Add some randomness to the delay to prevent thundering herd problem
+                    const randomDelay = delay + (Math.random() * 1000);
+                    await new Promise(resolve => setTimeout(resolve, randomDelay));
+                }
+            }
+        }
+        
         // Wait for DOM content to load before initializing
         document.addEventListener('DOMContentLoaded', () => {
             initThreeJSBackground(); // Initialize ORIGINAL background
             initSearchFunctionality(); // Initialize search with NEW toggle
             initBitcoinData(); // Initialize data fetching (adapted for original HTML)
-
+            
             // Original Tilt/Shine Effect Logic (from BTCsimulator/index.html)
             const panels = document.querySelectorAll('.panel');
-
+            
             panels.forEach(panel => {
-                 let leaveTimeout; // Timeout for resetting transition
-
+                let leaveTimeout; // Timeout for resetting transition
+                
                 panel.addEventListener('mousemove', (e) => {
                     if (window.innerWidth < 768) return; // Disable on mobile
-                     clearTimeout(leaveTimeout); // Clear reset timeout if mouse re-enters
-
+                    clearTimeout(leaveTimeout); // Clear reset timeout if mouse re-enters
+                    
                     const rect = panel.getBoundingClientRect();
                     const x = e.clientX - rect.left;
                     const y = e.clientY - rect.top;
-
+                    
                     const xPercent = x / rect.width - 0.5;
                     const yPercent = y / rect.height - 0.5;
-
+                    
                     const maxTilt = 10; // Original Max tilt
                     const tiltX = maxTilt * yPercent * -1;
                     const tiltY = maxTilt * xPercent;
-
+                    
                     // Apply transform directly with a quick transition for entering
                     panel.style.transition = 'transform 0.1s ease-out, box-shadow 0.3s'; // Include box-shadow transition
                     panel.style.transform = `perspective(1000px) rotateX(${tiltX}deg) rotateY(${tiltY}deg) scale3d(1.02, 1.02, 1.02)`;
                     panel.style.boxShadow = '0 5px 20px rgba(0, 243, 255, 0.4)'; // Add hover shadow from original CSS :hover
-
+                    
                     // Add/Update shine effect dynamically
                     let shine = panel.querySelector('.panel-shine');
                     if (!shine) {
@@ -1993,38 +2006,38 @@
                     shine.style.background = `radial-gradient(circle at ${x}px ${y}px, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0) 80%)`;
                     shine.style.opacity = '1'; // Make visible
                 });
-
+                
                 panel.addEventListener('mouseleave', () => {
-                     if (window.innerWidth < 768) return;
-
+                    if (window.innerWidth < 768) return;
+                    
                     // Reset transform with transition
                     panel.style.transition = 'transform 0.5s cubic-bezier(0.23, 1, 0.32, 1), box-shadow 0.3s'; // Smoother reset transition
                     panel.style.transform = 'perspective(1000px) rotateX(0) rotateY(0) scale3d(1, 1, 1)';
                     panel.style.boxShadow = '0 0 15px rgba(0, 243, 255, 0.2)'; // Reset shadow
-
+                    
                     // Fade out and remove shine effect
                     const shine = panel.querySelector('.panel-shine');
                     if (shine) {
-                         shine.style.opacity = '0';
-                         // Remove element after transition
-                         setTimeout(() => {
-                             if (panel.contains(shine) && shine.style.opacity === '0') {
-                                  panel.removeChild(shine);
-                             }
-                         }, 400); // Match CSS transition duration for opacity
+                        shine.style.opacity = '0';
+                        // Remove element after transition
+                        setTimeout(() => {
+                            if (panel.contains(shine) && shine.style.opacity === '0') {
+                                panel.removeChild(shine);
+                            }
+                        }, 400); // Match CSS transition duration for opacity
                     }
                     // Set timeout to restore original transition after reset animation completes
-                     leaveTimeout = setTimeout(() => {
-                         panel.style.transition = 'box-shadow 0.3s';
-                     }, 500);
+                    leaveTimeout = setTimeout(() => {
+                        panel.style.transition = 'box-shadow 0.3s';
+                    }, 500);
                 });
             });
-
-
-             // Add hover effect for NEW search button
-             const searchButton = document.querySelector('.search-button');
-             if (searchButton) {
-                 searchButton.addEventListener('mouseenter', () => {
+            
+            
+            // Add hover effect for NEW search button
+            const searchButton = document.querySelector('.search-button');
+            if (searchButton) {
+                searchButton.addEventListener('mouseenter', () => {
                     gsap.to(searchButton, {
                         boxShadow: '0 0 15px rgba(0, 153, 255, 0.5)',
                         scale: 1.05,
@@ -2034,7 +2047,7 @@
                     if (searchIcon) {
                         gsap.to(searchIcon, {
                             fill: 'rgba(0, 153, 255, 0.9)', duration: 0.3
-                         });
+                        });
                     }
                 });
                 searchButton.addEventListener('mouseleave', () => {
@@ -2043,15 +2056,15 @@
                         scale: 1,
                         duration: 0.3
                     });
-                     const searchIcon = searchButton.querySelector('.search-icon');
-                     if (searchIcon) {
-                         gsap.to(searchIcon, {
-                             fill: 'rgba(224, 224, 255, 0.8)', duration: 0.3
-                         });
+                    const searchIcon = searchButton.querySelector('.search-icon');
+                    if (searchIcon) {
+                        gsap.to(searchIcon, {
+                            fill: 'rgba(224, 224, 255, 0.8)', duration: 0.3
+                        });
                     }
                 });
             }
-
+            
         }); // End DOMContentLoaded
     </script>
 </body>
